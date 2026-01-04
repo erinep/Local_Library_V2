@@ -13,6 +13,10 @@
   box-sizing: border-box;
 }
 
+[hidden] {
+  display: none !important;
+}
+
 body {
   margin: 0;
   font-family: "Trebuchet MS", "Gill Sans", "Tahoma", sans-serif;
@@ -106,6 +110,11 @@ nav a:hover {
   background: #fffdf7;
 }
 
+.list-item.is-selected {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px rgba(31, 111, 91, 0.2);
+}
+
 .list-item a {
   color: var(--ink);
   text-decoration: none;
@@ -196,6 +205,12 @@ nav a:hover {
   border: 1px solid rgba(31, 111, 91, 0.2);
 }
 
+.tag-pill-proposed {
+  background: rgba(209, 123, 15, 0.12);
+  border-color: rgba(209, 123, 15, 0.35);
+  color: var(--accent-2);
+}
+
 .tag-pill a {
   color: var(--accent);
   text-decoration: none;
@@ -243,6 +258,66 @@ nav a:hover {
 .note {
   font-size: 13px;
   color: var(--muted);
+}
+
+.modal {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  z-index: 1000;
+}
+
+.modal-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(24, 20, 14, 0.45);
+  backdrop-filter: blur(2px);
+}
+
+.modal-panel {
+  position: relative;
+  z-index: 1;
+  width: min(720px, 92vw);
+  max-height: 80vh;
+  overflow: auto;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  padding: 18px;
+  box-shadow: 0 24px 60px var(--shadow);
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.modal-header h3 {
+  margin: 0;
+  font-family: "Palatino Linotype", "Book Antiqua", Palatino, serif;
+}
+
+.modal-close {
+  border: none;
+  background: transparent;
+  font-size: 24px;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.modal-close:hover {
+  color: var(--accent-2);
+}
+
+.modal-body {
+  display: grid;
+  gap: 12px;
 }
 
 @keyframes drop {

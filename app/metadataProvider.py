@@ -4,17 +4,13 @@ from dataclasses import dataclass
 import json
 import os
 from urllib.error import HTTPError, URLError
-from urllib.parse import urlencode
+from urllib.parse import quote, urlencode
 from urllib.request import Request, urlopen
 
 
 @dataclass(frozen=True)
 class TagCandidate:
     tag_text: str
-    tag_type: str | None = None
-    confidence: float | None = None
-    source_url: str | None = None
-    provider_key: str | None = None
 
 
 @dataclass(frozen=True)
@@ -37,7 +33,7 @@ def _build_query(author: str, title: str) -> str:
 
 class GoogleBooksProvider:
     def __init__(self, api_key: str | None = None, max_results: int = 10, timeout: float = 10.0) -> None:
-        self.api_key = os.getenv("GOOGLE_BOOKS_API_KEY")
+        self.api_key = api_key or os.getenv("GOOGLE_BOOKS_API_KEY")
         self.max_results = max_results
         self.timeout = timeout
 
@@ -79,4 +75,42 @@ class GoogleBooksProvider:
         return results
 
     def get_tags(self, result_id: str) -> list[TagCandidate]:
-        return []
+        volume = self._fetch_volume(result_id)
+        if not volume:
+            return []
+        categories = volume.get("categories") if isinstance(volume, dict) else None
+        if not isinstance(categories, list):
+            return []
+        tags: list[TagCandidate] = []
+        seen: set[str] = set()
+        for category in categories:
+            if not isinstance(category, str):
+                continue
+            parts = [part.strip() for part in category.split("/") if part.strip()]
+            for part in parts:
+                normalized = " ".join(part.split())
+                if not normalized:
+                    continue
+                key = normalized.lower()
+                if key in seen:
+                    continue
+                seen.add(key)
+                tags.append(TagCandidate(tag_text=normalized))
+        return tags
+
+    def _fetch_volume(self, result_id: str) -> dict[str, object] | None:
+        if not result_id:
+            return None
+        params = {}
+        if self.api_key:
+            params["key"] = self.api_key
+        query = f"?{urlencode(params)}" if params else ""
+        url = f"https://www.googleapis.com/books/v1/volumes/{quote(result_id)}{query}"
+        request = Request(url, headers={"Accept": "application/json"})
+        try:
+            with urlopen(request, timeout=self.timeout) as response:
+                payload = json.loads(response.read().decode("utf-8"))
+        except (HTTPError, URLError):
+            return None
+        volume = payload.get("volumeInfo") if isinstance(payload, dict) else None
+        return volume if isinstance(volume, dict) else None

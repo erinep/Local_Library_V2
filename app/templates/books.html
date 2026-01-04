@@ -11,6 +11,19 @@
         <p><a href="/ui/books">View all books</a></p>
       {% endif %}
       <p class="note">Select a title to review files and metadata.</p>
+      <form class="tag-form" method="get" action="/ui/books">
+        <input class="input" type="text" name="q" placeholder="Search titles or authors" value="{{ query }}" />
+        {% if author_id %}
+          <input type="hidden" name="author_id" value="{{ author_id }}" />
+        {% endif %}
+        {% if tag_id %}
+          <input type="hidden" name="tag_id" value="{{ tag_id }}" />
+        {% endif %}
+        <button class="btn btn-outline btn-small" type="submit">Search</button>
+        {% if query %}
+          <a class="btn btn-small" href="/ui/books{% if author_id %}?author_id={{ author_id }}{% elif tag_id %}?tag_id={{ tag_id }}{% endif %}">Clear</a>
+        {% endif %}
+      </form>
     </div>
   </section>
 

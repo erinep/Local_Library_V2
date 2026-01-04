@@ -1,0 +1,472 @@
+{% extends "base.html" %}
+{% block content %}
+  <section class="hero">
+    <div class="card">
+      <h2>Bulk Actions</h2>
+      <p class="note">Run library-wide maintenance tasks.</p>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="card">
+      <h3>Scan library</h3>
+      <p class="note">Index files and refresh totals.</p>
+      <button class="btn" type="button" data-scan>Run scan</button>
+      <p class="note" id="scan-status">Idle</p>
+    </div>
+    <div class="card">
+      <h3>Clear database</h3>
+      <p class="note">Deletes all indexed data and activity history.</p>
+      <button class="btn btn-outline" type="button" data-reset>Clear database</button>
+      <p class="note" id="reset-status">This deletes all indexed data.</p>
+    </div>
+    <div class="card">
+      <h3>Clear tags</h3>
+      <p class="note">Deletes all tags and tag links.</p>
+      <button class="btn btn-outline" type="button" data-reset-tags>Clear tags</button>
+      <p class="note" id="reset-tags-status">This deletes all tags and tag links.</p>
+    </div>
+    <div class="card">
+      <h3>Bulk tag books</h3>
+      <p class="note">Search Google Books for each title and apply tags.</p>
+      <button class="btn btn-outline" type="button" data-bulk-tags>Start bulk tagging</button>
+    </div>
+  </section>
+
+  <div class="modal" data-bulk-tags-modal hidden>
+    <div class="modal-overlay" data-bulk-close></div>
+    <div class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="bulkTagModalTitle">
+      <div class="modal-header">
+        <h3 id="bulkTagModalTitle">Bulk Tagging</h3>
+        <button class="modal-close" type="button" data-bulk-close aria-label="Close bulk tagging">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p class="note" data-bulk-status>Loading books...</p>
+        <div>
+          <strong data-bulk-title>Title</strong>
+          <div class="note" data-bulk-author></div>
+        </div>
+        <div class="tag-form">
+          <button class="btn btn-outline btn-small" type="button" data-bulk-search>Search tags</button>
+          <button class="btn btn-outline btn-small" type="button" data-bulk-skip>Skip book</button>
+          <button class="btn btn-small" type="button" data-bulk-add disabled>Add tags to book</button>
+          <button class="btn btn-outline btn-small" type="button" data-bulk-stop>Stop</button>
+        </div>
+        <div>
+          <small class="note">Current tags</small>
+          <div class="tag-list" data-bulk-current-tags></div>
+        </div>
+        <div>
+          <small class="note">Proposed tags</small>
+          <div class="tag-list" data-bulk-tags></div>
+        </div>
+        <div class="list" data-bulk-results></div>
+      </div>
+    </div>
+  </div>
+{% endblock %}
+{% block scripts %}
+  <script>
+    const scanButton = document.querySelector("[data-scan]");
+    const scanStatus = document.getElementById("scan-status");
+
+    if (scanButton && scanStatus) {
+      scanButton.addEventListener("click", async () => {
+        scanButton.disabled = true;
+        scanStatus.textContent = "Scanning...";
+        try {
+          const response = await fetch("/scan", { method: "POST" });
+          if (!response.ok) {
+            throw new Error(`Scan failed: ${response.status}`);
+          }
+          const result = await response.json();
+          scanStatus.textContent = `Indexed ${result.indexed} files at ${result.scanned_at}`;
+        } catch (error) {
+          scanStatus.textContent = "Scan failed. Check server logs.";
+        } finally {
+          scanButton.disabled = false;
+        }
+      });
+    }
+
+    const resetButton = document.querySelector("[data-reset]");
+    const resetStatus = document.getElementById("reset-status");
+    const resetTagsButton = document.querySelector("[data-reset-tags]");
+    const resetTagsStatus = document.getElementById("reset-tags-status");
+
+    if (resetButton && resetStatus) {
+      resetButton.addEventListener("click", async () => {
+        const confirmed = window.confirm("Clear the library database? This cannot be undone.");
+        if (!confirmed) {
+          return;
+        }
+        resetButton.disabled = true;
+        resetStatus.textContent = "Clearing...";
+        try {
+          const response = await fetch("/ui/reset", { method: "POST" });
+          if (!response.ok) {
+            throw new Error(`Reset failed: ${response.status}`);
+          }
+          resetStatus.textContent = "Database cleared. Run a new scan.";
+        } catch (error) {
+          resetStatus.textContent = "Reset failed. Check server logs.";
+        } finally {
+          resetButton.disabled = false;
+        }
+      });
+    }
+
+    if (resetTagsButton && resetTagsStatus) {
+      resetTagsButton.addEventListener("click", async () => {
+        const confirmed = window.confirm("Clear all tags? This cannot be undone.");
+        if (!confirmed) {
+          return;
+        }
+        resetTagsButton.disabled = true;
+        resetTagsStatus.textContent = "Clearing...";
+        try {
+          const response = await fetch("/ui/reset-tags", { method: "POST" });
+          if (!response.ok) {
+            throw new Error(`Reset failed: ${response.status}`);
+          }
+          resetTagsStatus.textContent = "Tags cleared.";
+        } catch (error) {
+          resetTagsStatus.textContent = "Reset failed. Check server logs.";
+        } finally {
+          resetTagsButton.disabled = false;
+        }
+      });
+    }
+
+    const bulkTagsButton = document.querySelector("[data-bulk-tags]");
+    const bulkModal = document.querySelector("[data-bulk-tags-modal]");
+    const bulkCloseButtons = bulkModal ? bulkModal.querySelectorAll("[data-bulk-close]") : [];
+    const bulkStopButton = bulkModal ? bulkModal.querySelector("[data-bulk-stop]") : null;
+    const bulkStatus = bulkModal ? bulkModal.querySelector("[data-bulk-status]") : null;
+    const bulkTitle = bulkModal ? bulkModal.querySelector("[data-bulk-title]") : null;
+    const bulkAuthor = bulkModal ? bulkModal.querySelector("[data-bulk-author]") : null;
+    const bulkCurrentTags = bulkModal ? bulkModal.querySelector("[data-bulk-current-tags]") : null;
+    const bulkResults = bulkModal ? bulkModal.querySelector("[data-bulk-results]") : null;
+    const bulkTagsPreview = bulkModal ? bulkModal.querySelector("[data-bulk-tags]") : null;
+    const bulkSearchButton = bulkModal ? bulkModal.querySelector("[data-bulk-search]") : null;
+    const bulkSkipButton = bulkModal ? bulkModal.querySelector("[data-bulk-skip]") : null;
+    const bulkAddButton = bulkModal ? bulkModal.querySelector("[data-bulk-add]") : null;
+
+    let bulkBooks = [];
+    let bulkIndex = 0;
+    let bulkSelectedResultId = null;
+    let bulkSelectedTags = [];
+    let bulkStopped = false;
+    let bulkRunning = false;
+
+    const bulkOpenModal = () => {
+      bulkModal.removeAttribute("hidden");
+      document.body.style.overflow = "hidden";
+    };
+
+    const bulkCloseModal = () => {
+      bulkModal.setAttribute("hidden", "");
+      document.body.style.overflow = "";
+    };
+
+    const bulkClearResults = () => {
+      if (bulkResults) {
+        bulkResults.innerHTML = "";
+      }
+      if (bulkTagsPreview) {
+        bulkTagsPreview.innerHTML = "";
+      }
+      bulkSelectedResultId = null;
+      bulkSelectedTags = [];
+      if (bulkAddButton) bulkAddButton.disabled = true;
+    };
+
+    const bulkSetStatus = (text) => {
+      if (bulkStatus) bulkStatus.textContent = text;
+    };
+
+    const bulkRenderCurrentTags = (tags) => {
+      if (!bulkCurrentTags) return;
+      bulkCurrentTags.innerHTML = "";
+      if (!tags || tags.length === 0) {
+        bulkCurrentTags.innerHTML = '<p class="note">No tags yet.</p>';
+        return;
+      }
+      tags.forEach((tag) => {
+        const pill = document.createElement("div");
+        pill.className = "tag-pill";
+        const label = document.createElement("span");
+        label.textContent = tag;
+        pill.appendChild(label);
+        bulkCurrentTags.appendChild(pill);
+      });
+    };
+
+    const bulkUpdateSelectedTags = () => {
+      if (!bulkTagsPreview) {
+        return;
+      }
+      const selected = Array.from(
+        bulkTagsPreview.querySelectorAll("input[type='checkbox']:checked")
+      ).map((input) => input.value);
+      bulkSelectedTags = selected;
+      if (bulkAddButton) bulkAddButton.disabled = bulkSelectedTags.length === 0;
+    };
+
+    const bulkRenderTags = (tags) => {
+      if (!bulkTagsPreview) return;
+      bulkTagsPreview.innerHTML = "";
+      if (!tags.length) {
+        bulkTagsPreview.innerHTML = '<p class="note">No tags returned.</p>';
+        return;
+      }
+      tags.forEach((tag) => {
+        const wrapper = document.createElement("label");
+        wrapper.className = "tag-pill tag-pill-proposed";
+        const checkbox = document.createElement("input");
+        checkbox.type = "checkbox";
+        checkbox.value = tag.tag_text;
+        checkbox.checked = true;
+        checkbox.addEventListener("change", bulkUpdateSelectedTags);
+        const label = document.createElement("span");
+        label.textContent = tag.tag_text;
+        wrapper.appendChild(checkbox);
+        wrapper.appendChild(label);
+        bulkTagsPreview.appendChild(wrapper);
+      });
+      bulkUpdateSelectedTags();
+    };
+
+    const bulkRenderResults = (results) => {
+      if (!bulkResults) return;
+      bulkResults.innerHTML = "";
+      if (!results.length) {
+        bulkSetStatus("No results found. Search again or skip.");
+        return;
+      }
+      bulkSetStatus("Select a result to fetch tags.");
+      results.forEach((result) => {
+        const item = document.createElement("div");
+        item.className = "list-item";
+        item.dataset.resultId = result.result_id;
+
+        const info = document.createElement("div");
+        const title = document.createElement("strong");
+        title.textContent = result.title || "Untitled";
+        const author = document.createElement("div");
+        author.className = "note";
+        author.textContent = result.author || "Unknown author";
+        info.appendChild(title);
+        info.appendChild(author);
+
+        const actions = document.createElement("div");
+        const selectButton = document.createElement("button");
+        selectButton.className = "btn btn-outline btn-small";
+        selectButton.type = "button";
+        selectButton.textContent = "Select";
+        selectButton.addEventListener("click", () => {
+          bulkSelectedResultId = result.result_id;
+          const items = bulkResults.querySelectorAll(".list-item");
+          items.forEach((node) => node.classList.remove("is-selected"));
+          item.classList.add("is-selected");
+          bulkSetStatus("Selected. Fetching tags...");
+          bulkGetTags();
+        });
+        actions.appendChild(selectButton);
+
+        item.appendChild(info);
+        item.appendChild(actions);
+        bulkResults.appendChild(item);
+      });
+    };
+
+    const bulkShowBook = () => {
+      if (bulkIndex >= bulkBooks.length) {
+        bulkSetStatus("All books processed.");
+        bulkClearResults();
+        return;
+      }
+      const book = bulkBooks[bulkIndex];
+      if (bulkTitle) bulkTitle.textContent = book.title || "Untitled";
+      if (bulkAuthor) bulkAuthor.textContent = book.author || "Unknown author";
+      bulkRenderCurrentTags(book.tags);
+      bulkClearResults();
+      bulkSetStatus("Search tags or skip this book.");
+    };
+
+    const bulkLoadBooks = async () => {
+      bulkSetStatus("Loading books...");
+      try {
+        const response = await fetch("/ui/bulk-actions/books");
+        if (!response.ok) {
+          throw new Error("Failed to load books.");
+        }
+        bulkBooks = await response.json();
+        bulkIndex = 0;
+        bulkStopped = false;
+        if (!bulkBooks.length) {
+          bulkSetStatus("No books found.");
+          return;
+        }
+        bulkShowBook();
+      } catch (error) {
+        bulkSetStatus("Unable to load books.");
+      }
+    };
+
+    const bulkSearchForBook = async (book) => {
+      if (!book) return [];
+      if (!book.title && !book.author) {
+        bulkSetStatus("Missing title and author. Skip this book.");
+        return [];
+      }
+      bulkSetStatus("Searching Google Books...");
+      try {
+        const params = new URLSearchParams();
+        if (book.title) params.set("title", book.title);
+        if (book.author) params.set("author", book.author);
+        const response = await fetch(`/search?${params.toString()}`);
+        if (!response.ok) {
+          throw new Error("Search failed.");
+        }
+        const results = await response.json();
+        bulkRenderResults(results);
+        return results;
+      } catch (error) {
+        bulkSetStatus("Search failed. Try again or skip.");
+        return [];
+      }
+    };
+
+    const bulkGetTags = async () => {
+      if (!bulkSelectedResultId) {
+        bulkSetStatus("Select a result first.");
+        return [];
+      }
+      bulkSetStatus("Loading tags...");
+      try {
+        const response = await fetch(`/search/${encodeURIComponent(bulkSelectedResultId)}/tags`);
+        if (!response.ok) {
+          throw new Error("Tags failed.");
+        }
+        const tags = await response.json();
+        bulkRenderTags(tags);
+        bulkSetStatus("Select tags, then add to book.");
+        return tags;
+      } catch (error) {
+        bulkSetStatus("Unable to load tags.");
+        return [];
+      }
+    };
+
+    const bulkAddTagsToBook = async (bookId, tags) => {
+      if (!tags.length) {
+        bulkSetStatus("No tags to add.");
+        return false;
+      }
+      bulkSetStatus("Adding tags...");
+      const formData = new FormData();
+      formData.set("tags", tags.join(", "));
+      try {
+        const response = await fetch(`/ui/books/${bookId}/tags`, {
+          method: "POST",
+          body: formData,
+        });
+        if (!response.ok) {
+          throw new Error("Add tags failed.");
+        }
+        return true;
+      } catch (error) {
+        bulkSetStatus("Unable to add tags.");
+        return false;
+      }
+    };
+
+    const bulkAddTags = async () => {
+      const book = bulkBooks[bulkIndex];
+      if (!book || !bulkSelectedTags.length) {
+        bulkSetStatus("No tags to add.");
+        return;
+      }
+      if (bulkAddButton) bulkAddButton.disabled = true;
+      const added = await bulkAddTagsToBook(book.book_id, bulkSelectedTags);
+      if (added) {
+        bulkIndex += 1;
+        bulkAdvanceLoop();
+      }
+    };
+
+    const bulkAdvanceLoop = async () => {
+      if (bulkRunning) return;
+      bulkRunning = true;
+      while (bulkIndex < bulkBooks.length) {
+        if (bulkStopped) break;
+        const book = bulkBooks[bulkIndex];
+        if (book.tags && book.tags.length > 0) {
+          bulkIndex += 1;
+          continue;
+        }
+        bulkShowBook();
+        const results = await bulkSearchForBook(book);
+        if (bulkStopped) break;
+        if (!results.length) {
+          bulkSetStatus("No results found. Moving to next book...");
+          bulkIndex += 1;
+          continue;
+        }
+        bulkSetStatus("Select a result to fetch tags.");
+        bulkRunning = false;
+        return;
+      }
+      bulkRunning = false;
+      if (!bulkStopped) {
+        bulkSetStatus("Bulk tagging complete.");
+        bulkClearResults();
+      }
+    };
+
+    const bulkSkipBook = () => {
+      bulkIndex += 1;
+      bulkAdvanceLoop();
+    };
+
+    const bulkStop = () => {
+      bulkStopped = true;
+      bulkRunning = false;
+      bulkCloseModal();
+    };
+
+    if (bulkTagsButton && bulkModal) {
+      bulkTagsButton.addEventListener("click", () => {
+        bulkOpenModal();
+        bulkLoadBooks().then(() => {
+          if (!bulkStopped) {
+            bulkAdvanceLoop();
+          }
+        });
+      });
+    }
+
+    if (bulkSearchButton) {
+      bulkSearchButton.addEventListener("click", async () => {
+        await bulkSearchForBook(bulkBooks[bulkIndex]);
+      });
+    }
+
+    if (bulkSkipButton) {
+      bulkSkipButton.addEventListener("click", bulkSkipBook);
+    }
+
+    if (bulkAddButton) {
+      bulkAddButton.addEventListener("click", bulkAddTags);
+    }
+
+    if (bulkStopButton) {
+      bulkStopButton.addEventListener("click", bulkStop);
+    }
+
+    bulkCloseButtons.forEach((button) => {
+      button.addEventListener("click", bulkCloseModal);
+    });
+  </script>
+{% endblock %}

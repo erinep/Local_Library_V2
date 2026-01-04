@@ -54,6 +54,17 @@ class BookSearchResult(BaseModel):
     author: str | None = None
 
 
+class TagCandidateResult(BaseModel):
+    tag_text: str
+
+
+class BookTagSummary(BaseModel):
+    book_id: int
+    title: str
+    author: str | None = None
+    tags: list[str]
+
+
 @app.on_event("startup")
 def startup() -> None:
     with get_connection() as conn:
@@ -103,12 +114,64 @@ def search_books(title: str | None = None, author: str | None = None) -> list[Bo
     ]
 
 
+@app.get("/search/{result_id}/tags", response_model=list[TagCandidateResult])
+def search_tags(result_id: str) -> list[TagCandidateResult]:
+    tags = _books_provider.get_tags(result_id)
+    return [
+        TagCandidateResult(tag_text=tag.tag_text)
+        for tag in tags
+    ]
+
+
+@app.get("/ui/bulk-actions/books", response_model=list[BookTagSummary])
+def ui_bulk_actions_books() -> list[BookTagSummary]:
+    with get_connection() as conn:
+        rows = conn.execute(
+            """
+            SELECT
+                b.id AS book_id,
+                b.title AS title,
+                a.name AS author,
+                t.name AS tag_name
+            FROM books b
+            LEFT JOIN authors a ON a.id = b.author_id
+            LEFT JOIN book_tags bt ON bt.book_id = b.id
+            LEFT JOIN tags t ON t.id = bt.tag_id
+            ORDER BY a.name, b.title, t.name
+            """
+        ).fetchall()
+    books: dict[int, BookTagSummary] = {}
+    for row in rows:
+        book_id = int(row["book_id"])
+        entry = books.get(book_id)
+        if entry is None:
+            entry = BookTagSummary(
+                book_id=book_id,
+                title=row["title"],
+                author=row["author"],
+                tags=[],
+            )
+            books[book_id] = entry
+        tag_name = row["tag_name"]
+        if tag_name:
+            entry.tags.append(tag_name)
+    return list(books.values())
+
+
 @app.get("/ui")
 def ui_dashboard(request: Request):
     totals, formatted_activity = _get_dashboard_data()
     return templates.TemplateResponse(
         "dashboard.html",
         {"request": request, "totals": totals, "issues": [], "activity": formatted_activity},
+    )
+
+
+@app.get("/ui/bulk-actions")
+def ui_bulk_actions(request: Request):
+    return templates.TemplateResponse(
+        "bulk_actions.html",
+        {"request": request},
     )
 
 
@@ -133,56 +196,53 @@ def ui_reset_tags() -> Response:
 
 
 @app.get("/ui/books")
-def ui_books(request: Request, author_id: int | None = None, tag_id: int | None = None):
+def ui_books(
+    request: Request,
+    author_id: int | None = None,
+    tag_id: int | None = None,
+    q: str | None = None,
+):
     author_name = None
     tag_name = None
+    search_term = _normalize_search(q)
     with get_connection() as conn:
         if author_id is not None and tag_id is not None:
             rows = []
-        elif author_id is not None:
-            author_row = conn.execute(
-                "SELECT name FROM authors WHERE id = ?",
-                (author_id,),
-            ).fetchone()
-            author_name = author_row["name"] if author_row else None
-            rows = conn.execute(
-                """
-                SELECT
-                    b.id,
-                    b.title,
-                    a.name AS author,
-                    (SELECT COUNT(*) FROM files f WHERE f.book_id = b.id) AS file_count
-                FROM books b
-                LEFT JOIN authors a ON a.id = b.author_id
-                WHERE b.author_id = ?
-                ORDER BY b.title
-                """,
-                (author_id,),
-            ).fetchall()
-        elif tag_id is not None:
-            tag_row = conn.execute(
-                "SELECT name FROM tags WHERE id = ?",
-                (tag_id,),
-            ).fetchone()
-            tag_name = tag_row["name"] if tag_row else None
-            rows = conn.execute(
-                """
-                SELECT
-                    b.id,
-                    b.title,
-                    a.name AS author,
-                    (SELECT COUNT(*) FROM files f WHERE f.book_id = b.id) AS file_count
-                FROM books b
-                LEFT JOIN authors a ON a.id = b.author_id
-                INNER JOIN book_tags bt ON bt.book_id = b.id
-                WHERE bt.tag_id = ?
-                ORDER BY a.name, b.title
-                """,
-                (tag_id,),
-            ).fetchall()
         else:
+            if author_id is not None:
+                author_row = conn.execute(
+                    "SELECT name FROM authors WHERE id = ?",
+                    (author_id,),
+                ).fetchone()
+                author_name = author_row["name"] if author_row else None
+            if tag_id is not None:
+                tag_row = conn.execute(
+                    "SELECT name FROM tags WHERE id = ?",
+                    (tag_id,),
+                ).fetchone()
+                tag_name = tag_row["name"] if tag_row else None
+
+            joins = []
+            where_clauses = []
+            params: list[object] = []
+            if tag_id is not None:
+                joins.append("INNER JOIN book_tags bt ON bt.book_id = b.id")
+                where_clauses.append("bt.tag_id = ?")
+                params.append(tag_id)
+            if author_id is not None:
+                where_clauses.append("b.author_id = ?")
+                params.append(author_id)
+            if search_term:
+                where_clauses.append("(b.title LIKE ? OR a.name LIKE ?)")
+                like_term = f"%{search_term}%"
+                params.extend([like_term, like_term])
+
+            join_sql = "\n                ".join(joins)
+            where_sql = f"WHERE {' AND '.join(where_clauses)}" if where_clauses else ""
+            order_by = "ORDER BY b.title" if author_id is not None else "ORDER BY a.name, b.title"
+
             rows = conn.execute(
-                """
+                f"""
                 SELECT
                     b.id,
                     b.title,
@@ -190,12 +250,23 @@ def ui_books(request: Request, author_id: int | None = None, tag_id: int | None 
                     (SELECT COUNT(*) FROM files f WHERE f.book_id = b.id) AS file_count
                 FROM books b
                 LEFT JOIN authors a ON a.id = b.author_id
-                ORDER BY a.name, b.title
-                """
+                {join_sql}
+                {where_sql}
+                {order_by}
+                """,
+                params,
             ).fetchall()
     return templates.TemplateResponse(
         "books.html",
-        {"request": request, "books": rows, "author_name": author_name, "tag_name": tag_name},
+        {
+            "request": request,
+            "books": rows,
+            "author_name": author_name,
+            "tag_name": tag_name,
+            "author_id": author_id,
+            "tag_id": tag_id,
+            "query": search_term or "",
+        },
     )
 
 
@@ -258,7 +329,8 @@ def ui_book_detail(request: Request, book_id: int):
                 b.id,
                 b.title,
                 b.path,
-                a.name AS author
+                a.name AS author,
+                b.author_id AS author_id
             FROM books b
             LEFT JOIN authors a ON a.id = b.author_id
             WHERE b.id = ?
@@ -367,6 +439,13 @@ def _split_tags(raw: str) -> list[str]:
         seen.add(key)
         cleaned.append(normalized)
     return cleaned
+
+
+def _normalize_search(raw: str | None) -> str | None:
+    if not raw:
+        return None
+    cleaned = " ".join(raw.split())
+    return cleaned or None
 
 
 def _infer_book_id(
