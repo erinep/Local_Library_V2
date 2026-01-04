@@ -30,7 +30,7 @@
           <div class="list-item">
             <div>
               <strong>{{ entry["event_type"] }}</strong><br />
-              <small>{{ entry["result"] or "No details" }}</small>
+              <small>{{ entry["result"] or "No result" }}</small>
             </div>
             <span class="badge">{{ entry["created_at"] }}</span>
           </div>
@@ -74,7 +74,7 @@
             item.innerHTML = `
               <div>
                 <strong>${entry.event_type}</strong><br />
-                <small>${entry.result || "No details"}</small>
+                <small>${entry.result || "No result"}</small>
               </div>
               <span class="badge">${entry.created_at}</span>
             `;

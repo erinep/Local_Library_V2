@@ -157,6 +157,68 @@ nav a:hover {
   box-shadow: none;
 }
 
+.btn-small {
+  padding: 8px 12px;
+  font-size: 13px;
+}
+
+.input {
+  flex: 1;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: #fffdf7;
+  font-size: 14px;
+  color: var(--ink);
+}
+
+.tag-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.tag-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.tag-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: rgba(31, 111, 91, 0.12);
+  border: 1px solid rgba(31, 111, 91, 0.2);
+}
+
+.tag-pill a {
+  color: var(--accent);
+  text-decoration: none;
+  font-weight: 700;
+}
+
+.tag-pill form {
+  margin: 0;
+}
+
+.tag-remove {
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  font-weight: 700;
+  cursor: pointer;
+  line-height: 1;
+}
+
+.tag-remove:hover {
+  color: var(--accent-2);
+}
+
 .table {
   width: 100%;
   border-collapse: collapse;

@@ -3,24 +3,55 @@ from __future__ import annotations
 from datetime import datetime
 from pathlib import Path
 
-from fastapi import FastAPI, Request, Response
+from urllib.parse import quote_plus
+from fastapi import FastAPI, Form, HTTPException, Request, Response
 from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 
 from .config import iter_files, load_config
-from .db import clear_library, clear_tags, get_connection, get_or_create_author, get_or_create_book, init_db, log_activity, upsert_files
+from .db import (
+    add_tags_to_book,
+    clear_library,
+    clear_tags,
+    get_book_tags,
+    get_connection,
+    get_or_create_author,
+    get_or_create_book,
+    get_or_create_tag,
+    init_db,
+    log_activity,
+    remove_tag_from_book,
+    upsert_files,
+)
+from .metadataProvider import GoogleBooksProvider
 
 app = FastAPI(title="Audiobook Library Backend")
+_books_provider = GoogleBooksProvider()
 
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
 templates = Jinja2Templates(directory="app/templates")
 
 
+def _urlencode(value: object) -> str:
+    if value is None:
+        return ''
+    return quote_plus(str(value))
+
+
+templates.env.filters['urlencode'] = _urlencode
+
+
 class ScanResult(BaseModel):
     indexed: int
     scanned_at: str
+
+
+class BookSearchResult(BaseModel):
+    result_id: str
+    title: str | None = None
+    author: str | None = None
 
 
 @app.on_event("startup")
@@ -61,6 +92,17 @@ def scan_library() -> ScanResult:
     return ScanResult(indexed=indexed, scanned_at=scanned_at)
 
 
+@app.get("/search", response_model=list[BookSearchResult])
+def search_books(title: str | None = None, author: str | None = None) -> list[BookSearchResult]:
+    if not title and not author:
+        raise HTTPException(status_code=400, detail="Provide at least a title or author.")
+    results = _books_provider.search(author=author or "", title=title or "")
+    return [
+        BookSearchResult(result_id=result.result_id, title=result.title, author=result.author)
+        for result in results
+    ]
+
+
 @app.get("/ui")
 def ui_dashboard(request: Request):
     totals, formatted_activity = _get_dashboard_data()
@@ -88,6 +130,7 @@ def ui_reset_tags() -> Response:
     with get_connection() as conn:
         clear_tags(conn)
     return Response(status_code=204)
+
 
 @app.get("/ui/books")
 def ui_books(request: Request, author_id: int | None = None, tag_id: int | None = None):
@@ -194,6 +237,18 @@ def ui_tags(request: Request):
     )
 
 
+@app.post("/ui/tags")
+def ui_add_tags(tags: str = Form(...)) -> RedirectResponse:
+    tag_names = _split_tags(tags)
+    created = 0
+    with get_connection() as conn:
+        for tag_name in tag_names:
+            tag_id, was_created = get_or_create_tag(conn, tag_name)
+            if tag_id is not None and was_created:
+                created += 1
+    return RedirectResponse("/ui/tags", status_code=303)
+
+
 @app.get("/ui/books/{book_id}")
 def ui_book_detail(request: Request, book_id: int):
     with get_connection() as conn:
@@ -210,6 +265,7 @@ def ui_book_detail(request: Request, book_id: int):
             """,
             (book_id,),
         ).fetchone()
+        tags = get_book_tags(conn, book_id)
         files = conn.execute(
             """
             SELECT path, size_bytes, modified_time
@@ -226,6 +282,7 @@ def ui_book_detail(request: Request, book_id: int):
         {
             "request": request,
             "book": book,
+            "tags": tags,
             "files": [
                 {
                     "path": row["path"],
@@ -236,6 +293,26 @@ def ui_book_detail(request: Request, book_id: int):
             ],
         },
     )
+
+
+@app.post("/ui/books/{book_id}/tags")
+def ui_add_book_tags(book_id: int, tags: str = Form(...)) -> RedirectResponse:
+    tag_names = _split_tags(tags)
+    tag_ids: list[int] = []
+    with get_connection() as conn:
+        for tag_name in tag_names:
+            tag_id, _ = get_or_create_tag(conn, tag_name)
+            if tag_id is not None:
+                tag_ids.append(tag_id)
+        added = add_tags_to_book(conn, book_id, tag_ids)
+    return RedirectResponse(f"/ui/books/{book_id}", status_code=303)
+
+
+@app.post("/ui/books/{book_id}/tags/{tag_id}/remove")
+def ui_remove_book_tag(book_id: int, tag_id: int) -> RedirectResponse:
+    with get_connection() as conn:
+        removed = remove_tag_from_book(conn, book_id, tag_id)
+    return RedirectResponse(f"/ui/books/{book_id}", status_code=303)
 
 
 def _format_bytes(size_bytes: int) -> str:
@@ -274,6 +351,22 @@ def _get_dashboard_data():
         for entry in activity
     ]
     return totals, formatted_activity
+
+
+def _split_tags(raw: str) -> list[str]:
+    parts = [part.strip() for part in raw.replace("\n", ",").split(",")]
+    seen: set[str] = set()
+    cleaned: list[str] = []
+    for part in parts:
+        normalized = " ".join(part.split())
+        if not normalized:
+            continue
+        key = normalized.lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        cleaned.append(normalized)
+    return cleaned
 
 
 def _infer_book_id(

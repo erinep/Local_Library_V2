@@ -22,7 +22,6 @@ def init_db(conn: sqlite3.Connection) -> None:
         CREATE TABLE IF NOT EXISTS activity_log (
             id INTEGER PRIMARY KEY,
             event_type TEXT NOT NULL,
-            details TEXT,
             result TEXT,
             created_at REAL NOT NULL
         );
@@ -64,17 +63,8 @@ def init_db(conn: sqlite3.Connection) -> None:
         CREATE INDEX IF NOT EXISTS idx_books_author_id ON books(author_id);
         """
     )
-    _ensure_column(conn, "files", "book_id", "INTEGER")
-    _ensure_column(conn, "activity_log", "event_type", "TEXT")
-    _ensure_column(conn, "activity_log", "details", "TEXT")
-    _ensure_column(conn, "activity_log", "result", "TEXT")
     conn.commit()
 
-
-def _ensure_column(conn: sqlite3.Connection, table: str, column: str, column_type: str) -> None:
-    existing = {row[1] for row in conn.execute(f"PRAGMA table_info({table})")}
-    if column not in existing:
-        conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {column_type}")
 
 
 def upsert_files(conn: sqlite3.Connection, rows: Iterable[tuple[str, int, float, int | None]]) -> int:
@@ -118,6 +108,7 @@ def clear_tags(conn: sqlite3.Connection) -> None:
     conn.commit()
     log_activity(conn, "clear_tags", "Tags tables cleared")
 
+
 def get_or_create_author(conn: sqlite3.Connection, name: str) -> int:
     conn.execute(
         """
@@ -145,12 +136,90 @@ def get_or_create_book(conn: sqlite3.Connection, title: str, author_id: int | No
         raise RuntimeError("Failed to load book id.")
     return int(row["id"])
 
-def log_activity(conn: sqlite3.Connection, event_type: str, result: str | None = None, details: str | None = None) -> None:
+
+def get_or_create_tag(conn: sqlite3.Connection, name: str) -> tuple[int | None, bool]:
+    cleaned = " ".join(name.split())
+    if not cleaned:
+        return None, False
+    row = conn.execute(
+        "SELECT id FROM tags WHERE name = ? COLLATE NOCASE",
+        (cleaned,),
+    ).fetchone()
+    if row is not None:
+        return int(row["id"]), False
     conn.execute(
         """
-        INSERT INTO activity_log (event_type, details, result, created_at)
-        VALUES (?, ?, ?, ?)
+        INSERT OR IGNORE INTO tags (name)
+        VALUES (?)
         """,
-        (event_type, details, result, time.time()),
+        (cleaned,),
+    )
+    row = conn.execute("SELECT id FROM tags WHERE name = ?", (cleaned,)).fetchone()
+    if row is None:
+        raise RuntimeError("Failed to load tag id.")
+    return int(row["id"]), True
+
+
+def add_tags_to_book(conn: sqlite3.Connection, book_id: int, tag_ids: Iterable[int]) -> int:
+    rows = [(book_id, tag_id) for tag_id in tag_ids]
+    if not rows:
+        return 0
+    cur = conn.cursor()
+    cur.executemany(
+        """
+        INSERT OR IGNORE INTO book_tags (book_id, tag_id)
+        VALUES (?, ?)
+        """,
+        rows,
+    )
+    conn.commit()
+    return cur.rowcount
+
+
+def remove_tag_from_book(conn: sqlite3.Connection, book_id: int, tag_id: int) -> int:
+    cur = conn.cursor()
+    cur.execute(
+        """
+        DELETE FROM book_tags
+        WHERE book_id = ? AND tag_id = ?
+        """,
+        (book_id, tag_id),
+    )
+    cur.execute(
+        """
+        DELETE FROM tags
+        WHERE id = ?
+          AND NOT EXISTS (
+              SELECT 1
+              FROM book_tags
+              WHERE tag_id = ?
+          )
+        """,
+        (tag_id, tag_id),
+    )
+    conn.commit()
+    return cur.rowcount
+
+
+def get_book_tags(conn: sqlite3.Connection, book_id: int) -> list[sqlite3.Row]:
+    return conn.execute(
+        """
+        SELECT t.id, t.name
+        FROM tags t
+        INNER JOIN book_tags bt ON bt.tag_id = t.id
+        WHERE bt.book_id = ?
+        ORDER BY t.name
+        """,
+        (book_id,),
+    ).fetchall()
+
+
+def log_activity(conn: sqlite3.Connection, event_type: str, result: str | None = None) -> None:
+    conn.execute(
+        """
+        INSERT INTO activity_log (event_type, result, created_at)
+        VALUES (?, ?, ?)
+        """,
+        (event_type, result, time.time()),
     )
     conn.commit()
