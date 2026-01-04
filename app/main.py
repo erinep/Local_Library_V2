@@ -14,8 +14,8 @@ from .db import clear_library, clear_tags, get_connection, get_or_create_author,
 
 app = FastAPI(title="Audiobook Library Backend")
 
-app.mount("/static", StaticFiles(directory="backend/static"), name="static")
-templates = Jinja2Templates(directory="backend/templates")
+app.mount("/static", StaticFiles(directory="app/static"), name="static")
+templates = Jinja2Templates(directory="app/templates")
 
 
 class ScanResult(BaseModel):
