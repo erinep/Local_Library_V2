@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{{ title or "Audiobook Library" }}</title>
+    <link rel="stylesheet" href="/static/app.css" />
+  </head>
+  <body>
+    <div class="page">
+      <header class="site">
+        <h1>Audiobook Library</h1>
+        <nav>
+          <a href="/ui">Dashboard</a>
+          <a href="/ui/books">Books</a>
+          <a href="/ui/authors">Authors</a>
+          <a href="/ui/tags">Tags</a>
+        </nav>
+      </header>
+      {% block content %}{% endblock %}
+    </div>
+    {% block scripts %}{% endblock %}
+  </body>
+</html>

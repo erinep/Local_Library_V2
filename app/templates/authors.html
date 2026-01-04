@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block content %}
+  <section class="hero">
+    <div class="card">
+      <h2>Authors</h2>
+      <p class="note">Choose an author to filter the book list.</p>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="card">
+      <h3>Library Authors</h3>
+      <div class="list">
+        {% for author in authors %}
+          <div class="list-item">
+            <div>
+              <a href="/ui/books?author_id={{ author['id'] }}">{{ author['name'] }}</a>
+            </div>
+            <span class="badge">{{ author['book_count'] }} books</span>
+          </div>
+        {% else %}
+          <p class="note">No authors found yet. Run a scan.</p>
+        {% endfor %}
+      </div>
+    </div>
+  </section>
+{% endblock %}

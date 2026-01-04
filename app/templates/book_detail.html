@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block content %}
+  <section class="hero">
+    <div class="card">
+      <h2>{{ book['title'] }}</h2>
+      <p><strong>{{ book['author'] or "Unknown author" }}</strong></p>
+      <p class="note">{{ book['path'] }}</p>
+    </div>
+    <div class="card">
+      <h3>Tags</h3>
+      <p class="note">User tags coming soon.</p>
+    </div>
+    <div class="card">
+      <h3>Cover</h3>
+      <p class="note">No cover detected.</p>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="card">
+      <h3>Files</h3>
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Path</th>
+            <th>Size</th>
+            <th>Modified</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for file in files %}
+            <tr>
+              <td>{{ file['path'] }}</td>
+              <td>{{ file['size'] }}</td>
+              <td>{{ file['modified'] }}</td>
+            </tr>
+          {% else %}
+            <tr>
+              <td colspan="3" class="note">No files attached to this book.</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+{% endblock %}

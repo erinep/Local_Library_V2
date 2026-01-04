@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block content %}
+  <section class="hero">
+    <div class="card">
+      <h2>Tags</h2>
+      <p class="note">Choose a tag to filter the book list.</p>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="card">
+      <h3>Library Tags</h3>
+      <div class="list">
+        {% for tag in tags %}
+          <div class="list-item">
+            <div>
+              <a href="/ui/books?tag_id={{ tag['id'] }}">{{ tag['name'] }}</a>
+            </div>
+            <span class="badge">{{ tag['book_count'] }} books</span>
+          </div>
+        {% else %}
+          <p class="note">No tags found yet.</p>
+        {% endfor %}
+      </div>
+    </div>
+  </section>
+{% endblock %}

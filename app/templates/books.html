@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block content %}
+  <section class="hero">
+    <div class="card">
+      <h2>
+        Books
+        {% if author_name %} by {{ author_name }}{% endif %}
+        {% if tag_name %} tagged {{ tag_name }}{% endif %}
+      </h2>
+      {% if author_name or tag_name %}
+        <p><a href="/ui/books">View all books</a></p>
+      {% endif %}
+      <p class="note">Select a title to review files and metadata.</p>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="card">
+      <h3>Library Titles</h3>
+      <div class="list">
+        {% for book in books %}
+          <div class="list-item">
+            <div>
+              <a href="/ui/books/{{ book['id'] }}">{{ book['title'] }}</a><br />
+              <small>{{ book['author'] or "Unknown author" }}</small>
+            </div>
+            <span class="badge">{{ book['file_count'] }} files</span>
+          </div>
+        {% else %}
+          <p class="note">No books found yet. Run a scan.</p>
+        {% endfor %}
+      </div>
+    </div>
+  </section>
+{% endblock %}
