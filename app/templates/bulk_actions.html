@@ -15,18 +15,6 @@
       <p class="note" id="scan-status">Idle</p>
     </div>
     <div class="card">
-      <h3>Clear database</h3>
-      <p class="note">Deletes all indexed data and activity history.</p>
-      <button class="btn btn-outline" type="button" data-reset>Clear database</button>
-      <p class="note" id="reset-status">This deletes all indexed data.</p>
-    </div>
-    <div class="card">
-      <h3>Clear tags</h3>
-      <p class="note">Deletes all tags and tag links.</p>
-      <button class="btn btn-outline" type="button" data-reset-tags>Clear tags</button>
-      <p class="note" id="reset-tags-status">This deletes all tags and tag links.</p>
-    </div>
-    <div class="card">
       <h3>Bulk tag books</h3>
       <p class="note">Search Google Books for each title and apply tags.</p>
       <button class="btn btn-outline" type="button" data-bulk-tags>Start bulk tagging</button>
@@ -85,55 +73,6 @@
           scanStatus.textContent = "Scan failed. Check server logs.";
         } finally {
           scanButton.disabled = false;
-        }
-      });
-    }
-
-    const resetButton = document.querySelector("[data-reset]");
-    const resetStatus = document.getElementById("reset-status");
-    const resetTagsButton = document.querySelector("[data-reset-tags]");
-    const resetTagsStatus = document.getElementById("reset-tags-status");
-
-    if (resetButton && resetStatus) {
-      resetButton.addEventListener("click", async () => {
-        const confirmed = window.confirm("Clear the library database? This cannot be undone.");
-        if (!confirmed) {
-          return;
-        }
-        resetButton.disabled = true;
-        resetStatus.textContent = "Clearing...";
-        try {
-          const response = await fetch("/ui/reset", { method: "POST" });
-          if (!response.ok) {
-            throw new Error(`Reset failed: ${response.status}`);
-          }
-          resetStatus.textContent = "Database cleared. Run a new scan.";
-        } catch (error) {
-          resetStatus.textContent = "Reset failed. Check server logs.";
-        } finally {
-          resetButton.disabled = false;
-        }
-      });
-    }
-
-    if (resetTagsButton && resetTagsStatus) {
-      resetTagsButton.addEventListener("click", async () => {
-        const confirmed = window.confirm("Clear all tags? This cannot be undone.");
-        if (!confirmed) {
-          return;
-        }
-        resetTagsButton.disabled = true;
-        resetTagsStatus.textContent = "Clearing...";
-        try {
-          const response = await fetch("/ui/reset-tags", { method: "POST" });
-          if (!response.ok) {
-            throw new Error(`Reset failed: ${response.status}`);
-          }
-          resetTagsStatus.textContent = "Tags cleared.";
-        } catch (error) {
-          resetTagsStatus.textContent = "Reset failed. Check server logs.";
-        } finally {
-          resetTagsButton.disabled = false;
         }
       });
     }

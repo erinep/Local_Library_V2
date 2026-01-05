@@ -36,6 +36,7 @@ def init_db(conn: sqlite3.Connection) -> None:
             author_id INTEGER,
             path TEXT UNIQUE NOT NULL,
             created_at REAL NOT NULL,
+            normalized_title TEXT,
             FOREIGN KEY(author_id) REFERENCES authors(id)
         );
         CREATE TABLE IF NOT EXISTS tags (
@@ -82,31 +83,6 @@ def upsert_files(conn: sqlite3.Connection, rows: Iterable[tuple[str, int, float,
     )
     conn.commit()
     return cur.rowcount
-
-
-def clear_library(conn: sqlite3.Connection) -> None:
-    conn.executescript(
-        """
-        DELETE FROM book_tags;
-        DELETE FROM tags;
-        DELETE FROM files;
-        DELETE FROM books;
-        DELETE FROM authors;
-        """
-    )
-    conn.commit()
-    log_activity(conn, "clear_library", "Library tables cleared")
-
-
-def clear_tags(conn: sqlite3.Connection) -> None:
-    conn.executescript(
-        """
-        DELETE FROM book_tags;
-        DELETE FROM tags;
-        """
-    )
-    conn.commit()
-    log_activity(conn, "clear_tags", "Tags tables cleared")
 
 
 def get_or_create_author(conn: sqlite3.Connection, name: str) -> int:

@@ -16,12 +16,9 @@
         {% if author_id %}
           <input type="hidden" name="author_id" value="{{ author_id }}" />
         {% endif %}
-        {% if tag_id %}
-          <input type="hidden" name="tag_id" value="{{ tag_id }}" />
-        {% endif %}
         <button class="btn btn-outline btn-small" type="submit">Search</button>
-        {% if query %}
-          <a class="btn btn-small" href="/ui/books{% if author_id %}?author_id={{ author_id }}{% elif tag_id %}?tag_id={{ tag_id }}{% endif %}">Clear</a>
+        {% if query or tag_id %}
+          <a class="btn btn-small" href="/ui/books{% if author_id %}?author_id={{ author_id }}{% endif %}">Clear</a>
         {% endif %}
       </form>
     </div>

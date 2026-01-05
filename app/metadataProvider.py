@@ -95,7 +95,7 @@ class GoogleBooksProvider:
                 if key in seen:
                     continue
                 seen.add(key)
-                tags.append(TagCandidate(tag_text=normalized))
+                tags.append(TagCandidate(tag_text=f"topic:{normalized}"))
         return tags
 
     def _fetch_volume(self, result_id: str) -> dict[str, object] | None:

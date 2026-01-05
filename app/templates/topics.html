@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block content %}
+  <section class="hero">
+    <div class="card">
+      <h2>Topics</h2>
+      <p class="note">Browse topic tags separately from other namespaces.</p>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="card">
+      <h3>Topic Tags</h3>
+      <div class="list">
+        {% for topic in topics %}
+          <div class="list-item">
+            <div>
+              <a href="/ui/books?tag_id={{ topic['id'] }}">{{ topic['display_name'] }}</a>
+            </div>
+            <span class="badge">{{ topic['book_count'] }} books</span>
+          </div>
+        {% else %}
+          <p class="note">No topics found yet.</p>
+        {% endfor %}
+      </div>
+    </div>
+  </section>
+{% endblock %}

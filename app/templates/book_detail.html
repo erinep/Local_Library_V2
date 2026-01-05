@@ -25,21 +25,35 @@
       </button>
     </div>
     <div class="card">
-      <h3>Tags</h3>
-      <form class="tag-form" method="post" action="/ui/books/{{ book['id'] }}/tags">
-        <input class="input" type="text" name="tags" placeholder="Add tags, comma separated" />
-        <button class="btn btn-outline btn-small" type="submit">Add</button>
-      </form>
-      <div class="tag-list">
+      <h3>Recommendation Parameters</h3>
+      <div class="tag-list tag-list-plain tag-list-config">
         {% for tag in tags %}
           <div class="tag-pill">
-            <a href="/ui/books?tag_id={{ tag['id'] }}">{{ tag['name'] }}</a>
-            <form method="post" action="/ui/books/{{ book['id'] }}/tags/{{ tag['id'] }}/remove">
-              <button class="tag-remove" type="submit" aria-label="Remove tag {{ tag['name'] }}">&times;</button>
-            </form>
+            <span class="config-key">{{ tag['name'].split(':', 1)[0] }}</span>
+            <span class="config-sep">:</span>
+            <span class="config-value">{{ tag['name'].split(':', 1)[1] if ':' in tag['name'] else tag['name'] }}</span>
           </div>
         {% else %}
           <p class="note">No tags yet. Add the first one.</p>
+        {% endfor %}
+      </div>
+    </div>
+    <div class="card">
+      <h3>Topics</h3>
+      <form class="tag-form" method="post" action="/ui/books/{{ book['id'] }}/tags">
+        <input class="input" type="text" name="tags" placeholder="Add topics, comma separated" />
+        <button class="btn btn-outline btn-small" type="submit">Add</button>
+      </form>
+      <div class="tag-list">
+        {% for topic in topics %}
+          <div class="tag-pill">
+            <a href="/ui/books?tag_id={{ topic['id'] }}">{{ topic['display_name'] }}</a>
+            <form method="post" action="/ui/books/{{ book['id'] }}/tags/{{ topic['id'] }}/remove">
+              <button class="tag-remove" type="submit" aria-label="Remove topic {{ topic['display_name'] }}">&times;</button>
+            </form>
+          </div>
+        {% else %}
+          <p class="note">No topics yet.</p>
         {% endfor %}
       </div>
     </div>

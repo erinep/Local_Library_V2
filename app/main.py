@@ -4,7 +4,7 @@ from datetime import datetime
 from pathlib import Path
 
 from urllib.parse import quote_plus
-from fastapi import FastAPI, Form, HTTPException, Request, Response
+from fastapi import FastAPI, Form, HTTPException, Query, Request, Response
 from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -13,8 +13,6 @@ from pydantic import BaseModel
 from .config import iter_files, load_config
 from .db import (
     add_tags_to_book,
-    clear_library,
-    clear_tags,
     get_book_tags,
     get_connection,
     get_or_create_author,
@@ -41,6 +39,19 @@ def _urlencode(value: object) -> str:
 
 
 templates.env.filters['urlencode'] = _urlencode
+
+RECOMMENDATION_NAMESPACES = [
+    "Genre",
+    "Pacing",
+    "Reader",
+    "Romance",
+    "Scale",
+    "Series",
+    "Setting",
+    "Spice",
+    "StoryEngine",
+    "Tone",
+]
 
 
 class ScanResult(BaseModel):
@@ -181,18 +192,140 @@ def ui_summary() -> dict[str, object]:
     return {"totals": dict(totals), "activity": formatted_activity}
 
 
-@app.post("/ui/reset")
-def ui_reset_library() -> Response:
-    with get_connection() as conn:
-        clear_library(conn)
-    return Response(status_code=204)
+@app.get("/ui/recommendations")
+def ui_recommendations(
+    request: Request,
+    genre: str | None = None,
+    pacing: str | None = None,
+    reader: str | None = None,
+    romance: str | None = None,
+    scale: str | None = None,
+    series: str | None = None,
+    setting: str | None = None,
+    spice: str | None = None,
+    storyengine: str | None = None,
+    tone: str | None = None,
+    topic_id: list[int] = Query(default=[]),
+):
+    def _parse_int(value: str | None) -> int | None:
+        if value is None:
+            return None
+        stripped = value.strip()
+        return int(stripped) if stripped else None
 
-
-@app.post("/ui/reset-tags")
-def ui_reset_tags() -> Response:
+    genre_id = _parse_int(genre)
+    pacing_id = _parse_int(pacing)
+    reader_id = _parse_int(reader)
+    romance_id = _parse_int(romance)
+    scale_id = _parse_int(scale)
+    series_id = _parse_int(series)
+    setting_id = _parse_int(setting)
+    spice_id = _parse_int(spice)
+    storyengine_id = _parse_int(storyengine)
+    tone_id = _parse_int(tone)
     with get_connection() as conn:
-        clear_tags(conn)
-    return Response(status_code=204)
+        tag_rows = conn.execute(
+            """
+            SELECT id, name
+            FROM tags
+            WHERE name LIKE '%:%'
+            ORDER BY name
+            """
+        ).fetchall()
+        grouped: dict[str, list[dict[str, object]]] = {ns: [] for ns in RECOMMENDATION_NAMESPACES}
+        topics: list[dict[str, object]] = []
+        for row in tag_rows:
+            name = str(row["name"])
+            if ":" not in name:
+                continue
+            namespace, value = name.split(":", 1)
+            value = value.strip()
+            if namespace.lower() == "topic":
+                topics.append({"id": row["id"], "name": name, "display_name": value})
+            elif namespace in grouped:
+                grouped[namespace].append({"id": row["id"], "name": name, "display_name": value})
+
+        selected = {
+            "Genre": genre_id,
+            "Pacing": pacing_id,
+            "Reader": reader_id,
+            "Romance": romance_id,
+            "Scale": scale_id,
+            "Series": series_id,
+            "Setting": setting_id,
+            "Spice": spice_id,
+            "StoryEngine": storyengine_id,
+            "Tone": tone_id,
+            "Topic": topic_id,
+        }
+
+        selected_tag_ids: list[int] = [
+            value for value in (
+                genre_id,
+                pacing_id,
+                reader_id,
+                romance_id,
+                scale_id,
+                series_id,
+                setting_id,
+                spice_id,
+                storyengine_id,
+                tone_id,
+            )
+            if value is not None
+        ]
+        selected_tag_ids.extend(topic_id)
+
+        if selected_tag_ids:
+            placeholders = ", ".join("?" for _ in selected_tag_ids)
+            rows = conn.execute(
+                f"""
+                SELECT
+                    b.id,
+                    b.title,
+                    a.name AS author,
+                    (SELECT COUNT(*) FROM files f WHERE f.book_id = b.id) AS file_count
+                FROM books b
+                LEFT JOIN authors a ON a.id = b.author_id
+                INNER JOIN book_tags bt ON bt.book_id = b.id
+                WHERE bt.tag_id IN ({placeholders})
+                GROUP BY b.id
+                HAVING COUNT(DISTINCT bt.tag_id) = ?
+                ORDER BY a.name, b.title
+                """,
+                [*selected_tag_ids, len(selected_tag_ids)],
+            ).fetchall()
+        else:
+            rows = []
+
+        label_map = {item["id"]: item["display_name"] for group in grouped.values() for item in group}
+        topic_labels = {item["id"]: item["display_name"] for item in topics}
+        summary_parts: list[str] = []
+        for key in RECOMMENDATION_NAMESPACES:
+            tag_id = selected.get(key)
+            if not tag_id:
+                continue
+            label = label_map.get(tag_id)
+            if label:
+                summary_parts.append(f"{key}: {label}")
+        if topic_id:
+            names = [topic_labels.get(tid) for tid in topic_id if topic_labels.get(tid)]
+            if names:
+                summary_parts.append(f"Topics: {', '.join(names)}")
+        summary = "No filters selected." if not summary_parts else "Filters: " + " | ".join(summary_parts)
+
+    return templates.TemplateResponse(
+        "recommendations.html",
+        {
+            "request": request,
+            "namespaces": RECOMMENDATION_NAMESPACES,
+            "grouped": grouped,
+            "topics": topics,
+            "selected": selected,
+            "books": rows,
+            "summary": summary,
+        },
+    )
 
 
 @app.get("/ui/books")
@@ -299,6 +432,7 @@ def ui_tags(request: Request):
                 t.name,
                 (SELECT COUNT(*) FROM book_tags bt WHERE bt.tag_id = t.id) AS book_count
             FROM tags t
+            WHERE t.name NOT LIKE 'topic:%'
             ORDER BY t.name
             """
         ).fetchall()
@@ -308,9 +442,42 @@ def ui_tags(request: Request):
     )
 
 
+@app.get("/ui/topics")
+def ui_topics(request: Request):
+    with get_connection() as conn:
+        rows = conn.execute(
+            """
+            SELECT
+                t.id,
+                t.name,
+                (SELECT COUNT(*) FROM book_tags bt WHERE bt.tag_id = t.id) AS book_count
+            FROM tags t
+            WHERE t.name LIKE 'topic:%'
+            ORDER BY t.name
+            """
+        ).fetchall()
+    topics = [
+        {
+            "id": row["id"],
+            "name": row["name"],
+            "display_name": row["name"].split(":", 1)[1].strip() if ":" in row["name"] else row["name"],
+            "book_count": row["book_count"],
+        }
+        for row in rows
+    ]
+    return templates.TemplateResponse(
+        "topics.html",
+        {"request": request, "topics": topics},
+    )
+
+
 @app.post("/ui/tags")
 def ui_add_tags(tags: str = Form(...)) -> RedirectResponse:
     tag_names = _split_tags(tags)
+    tag_names = [
+        name if name.lower().startswith("topic:") else f"topic:{name}"
+        for name in tag_names
+    ]
     created = 0
     with get_connection() as conn:
         for tag_name in tag_names:
@@ -354,7 +521,18 @@ def ui_book_detail(request: Request, book_id: int):
         {
             "request": request,
             "book": book,
-            "tags": tags,
+            "tags": [tag for tag in tags if not str(tag["name"]).lower().startswith("topic:")],
+            "topics": [
+                {
+                    "id": tag["id"],
+                    "name": tag["name"],
+                    "display_name": str(tag["name"]).split(":", 1)[1].strip()
+                    if ":" in str(tag["name"])
+                    else tag["name"],
+                }
+                for tag in tags
+                if str(tag["name"]).lower().startswith("topic:")
+            ],
             "files": [
                 {
                     "path": row["path"],
@@ -370,6 +548,10 @@ def ui_book_detail(request: Request, book_id: int):
 @app.post("/ui/books/{book_id}/tags")
 def ui_add_book_tags(book_id: int, tags: str = Form(...)) -> RedirectResponse:
     tag_names = _split_tags(tags)
+    tag_names = [
+        name if name.lower().startswith("topic:") else f"topic:{name}"
+        for name in tag_names
+    ]
     tag_ids: list[int] = []
     with get_connection() as conn:
         for tag_name in tag_names:

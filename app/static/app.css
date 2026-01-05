@@ -205,6 +205,48 @@ nav a:hover {
   border: 1px solid rgba(31, 111, 91, 0.2);
 }
 
+.tag-list-plain .tag-pill {
+  padding: 0;
+  border: none;
+  background: transparent;
+  border-radius: 0;
+}
+
+.tag-list-plain .tag-pill a {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.tag-list-config {
+  display: grid;
+  gap: 8px;
+}
+
+.tag-list-config .tag-pill {
+  padding: 6px 10px;
+  border-radius: 10px;
+  background: #f7f1e6;
+  border: 1px dashed var(--line);
+}
+
+.tag-list-config .config-key {
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.tag-list-config .config-sep {
+  color: var(--muted);
+  margin: 0 6px;
+}
+
+.tag-list-config .config-value {
+  font-weight: 600;
+  color: var(--ink);
+}
+
 .tag-pill-proposed {
   background: rgba(209, 123, 15, 0.12);
   border-color: rgba(209, 123, 15, 0.35);
@@ -258,6 +300,156 @@ nav a:hover {
 .note {
   font-size: 13px;
   color: var(--muted);
+}
+
+.recommendations-form .note-active {
+  display: none;
+}
+
+.recommendations-form[data-active="true"] .note-active {
+  display: block;
+  border: 1px solid rgba(31, 111, 91, 0.3);
+  background: rgba(31, 111, 91, 0.08);
+  padding: 10px 12px;
+  border-radius: 10px;
+}
+
+.recommendations-form[data-active="true"] .input {
+  border-color: rgba(31, 111, 91, 0.4);
+}
+
+.recommendations-form .tag-form {
+  align-items: flex-end;
+}
+
+.recommendations-form .rec-namespace {
+  flex-direction: row;
+  align-items: flex-start;
+}
+
+.recommendations-form .rec-field {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.recommendations-form .rec-field .note {
+  min-width: 120px;
+  margin: 0;
+}
+
+.recommendations-form .rec-group {
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #fffdf7;
+  display: grid;
+  gap: 8px;
+  min-height: 220px;
+  flex: 1 1 220px;
+  align-content: start;
+  grid-auto-rows: min-content;
+  position: relative;
+}
+
+.recommendations-form .rec-group[data-active="true"] {
+  border-color: rgba(31, 111, 91, 0.5);
+  background: rgba(31, 111, 91, 0.08);
+}
+
+.recommendations-form .rec-group:not(.rec-group-topics) {
+  flex: 0 0 200px;
+  min-width: 200px;
+}
+
+.recommendations-form .rec-group-topics {
+  flex: 0 0 260px;
+  min-width: 330px;
+  max-height: fit-content;
+}
+
+.tag-list-topics {
+  margin-top: 8px;
+}
+
+.topic-suggest {
+  position: static;
+  margin-top: 6px;
+  margin-top: 0;
+  background: #fffdf7;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  box-shadow: 0 18px 40px var(--shadow);
+  max-height: 220px;
+  overflow: auto;
+  width: 100%;
+  padding: 6px;
+}
+
+.topic-suggest-item {
+  display: block;
+  width: 100%;
+  padding: 8px 10px;
+  border: none;
+  background: transparent;
+  text-align: left;
+  font-size: 14px;
+  cursor: pointer;
+  border-radius: 8px;
+}
+
+.topic-suggest-item:hover {
+  background: rgba(31, 111, 91, 0.08);
+}
+
+.topic-suggest-item.is-active {
+  background: rgba(31, 111, 91, 0.18);
+}
+
+.rec-group-topics .tag-form {
+  position: relative;
+  flex-wrap: nowrap;
+  gap: 10px;
+}
+
+.rec-group-topics .input {
+  flex: 1;
+}
+
+.rec-group-topics .btn {
+  white-space: nowrap;
+}
+
+.recommendations-form .rec-group-title {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+  font-weight: 700;
+}
+
+.recommendations-form .rec-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 14px;
+  color: var(--ink);
+}
+
+.recommendations-form .rec-option input {
+  accent-color: var(--accent);
+}
+
+.recommendations-form .tag-form .note {
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin: 0 0 4px;
+}
+
+.recommendations-form .input {
+  min-width: 180px;
 }
 
 .modal {
