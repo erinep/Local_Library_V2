@@ -7,7 +7,7 @@ from enum import Enum
 from pathlib import Path
 from typing import Iterable
 
-DB_PATH = Path(__file__).resolve().parent.parent / "library.db"
+from .config import load_config
 
 
 class ActivityEvent(str, Enum):
@@ -19,7 +19,12 @@ class ActivityEvent(str, Enum):
     BULK_TAGGING_COMPLETED = "bulk_tagging_completed"
 
 
-def get_connection(db_path: Path = DB_PATH) -> sqlite3.Connection:
+def get_connection(db_path: Path | None = None) -> sqlite3.Connection:
+    if db_path is None:
+        db_path = load_config().db_path
+    db_path.parent.mkdir(parents=True, exist_ok=True)
+    if not db_path.exists():
+        db_path.touch()
     conn = sqlite3.connect(db_path)
     conn.row_factory = sqlite3.Row
     return conn
