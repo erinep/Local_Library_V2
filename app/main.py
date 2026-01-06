@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from datetime import datetime
+import csv
+import io
 from pathlib import Path
 
 from urllib.parse import quote_plus
@@ -13,6 +15,8 @@ from pydantic import BaseModel
 from .config import iter_files, load_config
 from .db import (
     add_tags_to_book,
+    clean_unused_tags,
+    ActivityEvent,
     get_book_tags,
     get_connection,
     get_or_create_author,
@@ -77,6 +81,12 @@ class BookTagSummary(BaseModel):
     tags: list[str]
 
 
+class BulkTaggingResult(BaseModel):
+    status: str
+    processed: int | None = None
+    total: int | None = None
+
+
 @app.on_event("startup")
 def startup() -> None:
     with get_connection() as conn:
@@ -105,7 +115,13 @@ def scan_library() -> ScanResult:
             book_id = _infer_book_id(conn, path, config.library_roots, author_cache, book_cache)
             rows.append((str(path), stat.st_size, stat.st_mtime, book_id))
         indexed = upsert_files(conn, rows)
-        log_activity(conn, "scan_library", f"{indexed} files indexed")
+        log_activity(
+            conn,
+            ActivityEvent.SCAN_LIBRARY,
+            f"{indexed} files indexed",
+            metadata={"indexed": indexed},
+            source="scan_library",
+        )
 
     scanned_at = datetime.utcnow().isoformat() + "Z"
     return ScanResult(indexed=indexed, scanned_at=scanned_at)
@@ -163,7 +179,90 @@ def ui_bulk_actions_books() -> list[BookTagSummary]:
         tag_name = row["tag_name"]
         if tag_name:
             entry.tags.append(tag_name)
-    return list(books.values())
+    results = list(books.values())
+    with get_connection() as conn:
+        log_activity(
+            conn,
+            ActivityEvent.BULK_TAGGING_STARTED,
+            f"{len(results)} books loaded for bulk tagging",
+            metadata={"book_count": len(results)},
+            source="bulk_actions_books",
+        )
+    return results
+
+
+@app.get("/ui/bulk-actions/export")
+def ui_bulk_actions_export() -> Response:
+    with get_connection() as conn:
+        rows = conn.execute(
+            """
+            SELECT
+                b.id,
+                b.title,
+                a.name AS author,
+                t.name AS tag_name
+            FROM books b
+            LEFT JOIN authors a ON a.id = b.author_id
+            LEFT JOIN book_tags bt ON bt.book_id = b.id
+            LEFT JOIN tags t ON t.id = bt.tag_id
+            ORDER BY a.name, b.title, t.name
+            """
+        ).fetchall()
+    books: dict[int, dict[str, object]] = {}
+    prefixes: set[str] = set()
+    for row in rows:
+        book_id = int(row["id"])
+        entry = books.get(book_id)
+        if entry is None:
+            entry = {
+                "id": book_id,
+                "title": row["title"],
+                "author": row["author"] or "",
+                "tags": {},
+            }
+            books[book_id] = entry
+        tag_name = row["tag_name"]
+        if not tag_name:
+            continue
+        tag_text = str(tag_name)
+        if ":" in tag_text:
+            prefix, value = tag_text.split(":", 1)
+            prefix = prefix.strip() or "General"
+            value = value.strip()
+        else:
+            prefix = "General"
+            value = tag_text.strip()
+        if not value:
+            continue
+        prefixes.add(prefix)
+        tag_bucket = entry["tags"].setdefault(prefix, [])
+        tag_bucket.append(value)
+
+    sorted_prefixes = sorted(prefixes)
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(["id", "title", "author", *sorted_prefixes])
+    for entry in books.values():
+        row_values = [
+            entry["id"],
+            entry["title"],
+            entry["author"],
+        ]
+        tags_by_prefix: dict[str, list[str]] = entry["tags"]
+        for prefix in sorted_prefixes:
+            values = tags_by_prefix.get(prefix, [])
+            row_values.append(", ".join(values))
+        writer.writerow(row_values)
+    headers = {"Content-Disposition": "attachment; filename=books_export.csv"}
+    with get_connection() as conn:
+        log_activity(
+            conn,
+            ActivityEvent.EXPORT_LIBRARY_CSV,
+            f"{len(books)} books exported",
+            metadata={"book_count": len(books), "tag_prefixes": sorted_prefixes},
+            source="bulk_actions_export",
+        )
+    return Response(content=output.getvalue(), media_type="text/csv", headers=headers)
 
 
 @app.get("/ui")
@@ -181,6 +280,41 @@ def ui_bulk_actions(request: Request):
         "bulk_actions.html",
         {"request": request},
     )
+
+
+@app.post("/ui/bulk-actions/cleanup-tags")
+def ui_cleanup_tags() -> dict[str, int]:
+    with get_connection() as conn:
+        removed = clean_unused_tags(conn)
+        log_activity(
+            conn,
+            ActivityEvent.CLEAN_UNUSED_TAGS,
+            f"{removed} tags removed",
+            metadata={"removed": removed},
+            source="cleanup_tags",
+        )
+    return {"removed": removed}
+
+
+@app.post("/ui/bulk-actions/complete")
+def ui_bulk_actions_complete(payload: BulkTaggingResult) -> dict[str, int | None | str]:
+    normalized = payload.status.lower()
+    if normalized not in {"completed", "stopped"}:
+        normalized = "completed"
+    with get_connection() as conn:
+        log_activity(
+            conn,
+            ActivityEvent.BULK_TAGGING_COMPLETED,
+            f"bulk tagging {normalized}",
+            status="success" if normalized == "completed" else "stopped",
+            metadata={
+                "processed": payload.processed,
+                "total": payload.total,
+                "status": normalized,
+            },
+            source="bulk_tagging_complete",
+        )
+    return {"processed": payload.processed, "total": payload.total, "status": normalized}
 
 
 @app.get("/ui/summary")
@@ -553,6 +687,13 @@ def ui_add_book_tags(book_id: int, tags: str = Form(...)) -> RedirectResponse:
             if tag_id is not None:
                 tag_ids.append(tag_id)
         added = add_tags_to_book(conn, book_id, tag_ids)
+        log_activity(
+            conn,
+            ActivityEvent.BOOK_TAGS_UPDATED,
+            f"{added} tags added",
+            metadata={"book_id": book_id, "tag_ids": tag_ids, "added": added},
+            source="add_book_tags",
+        )
     return RedirectResponse(f"/ui/books/{book_id}", status_code=303)
 
 
@@ -560,6 +701,13 @@ def ui_add_book_tags(book_id: int, tags: str = Form(...)) -> RedirectResponse:
 def ui_remove_book_tag(book_id: int, tag_id: int) -> RedirectResponse:
     with get_connection() as conn:
         removed = remove_tag_from_book(conn, book_id, tag_id)
+        log_activity(
+            conn,
+            ActivityEvent.BOOK_TAGS_UPDATED,
+            "tag removed",
+            metadata={"book_id": book_id, "tag_id": tag_id, "removed": removed},
+            source="remove_book_tag",
+        )
     return RedirectResponse(f"/ui/books/{book_id}", status_code=303)
 
 

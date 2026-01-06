@@ -1,11 +1,22 @@
 from __future__ import annotations
 
+import json
 import sqlite3
 import time
+from enum import Enum
 from pathlib import Path
 from typing import Iterable
 
 DB_PATH = Path(__file__).resolve().parent.parent / "library.db"
+
+
+class ActivityEvent(str, Enum):
+    SCAN_LIBRARY = "scan_library"
+    EXPORT_LIBRARY_CSV = "export_library_csv"
+    CLEAN_UNUSED_TAGS = "clean_unused_tags"
+    BOOK_TAGS_UPDATED = "book_tags_updated"
+    BULK_TAGGING_STARTED = "bulk_tagging_started"
+    BULK_TAGGING_COMPLETED = "bulk_tagging_completed"
 
 
 def get_connection(db_path: Path = DB_PATH) -> sqlite3.Connection:
@@ -22,7 +33,13 @@ def init_db(conn: sqlite3.Connection) -> None:
         CREATE TABLE IF NOT EXISTS activity_log (
             id INTEGER PRIMARY KEY,
             event_type TEXT NOT NULL,
+            level TEXT NOT NULL,
+            status TEXT NOT NULL,
             result TEXT,
+            metadata TEXT,
+            source TEXT,
+            actor_type TEXT,
+            actor_id TEXT,
             created_at REAL NOT NULL
         );
         CREATE TABLE IF NOT EXISTS authors (
@@ -177,6 +194,22 @@ def remove_tag_from_book(conn: sqlite3.Connection, book_id: int, tag_id: int) ->
     return cur.rowcount
 
 
+def clean_unused_tags(conn: sqlite3.Connection) -> int:
+    cur = conn.cursor()
+    cur.execute(
+        """
+        DELETE FROM tags
+        WHERE NOT EXISTS (
+            SELECT 1
+            FROM book_tags
+            WHERE book_tags.tag_id = tags.id
+        )
+        """
+    )
+    conn.commit()
+    return cur.rowcount
+
+
 def get_book_tags(conn: sqlite3.Connection, book_id: int) -> list[sqlite3.Row]:
     return conn.execute(
         """
@@ -190,12 +223,44 @@ def get_book_tags(conn: sqlite3.Connection, book_id: int) -> list[sqlite3.Row]:
     ).fetchall()
 
 
-def log_activity(conn: sqlite3.Connection, event_type: str, result: str | None = None) -> None:
+def log_activity(
+    conn: sqlite3.Connection,
+    event_type: ActivityEvent | str,
+    result: str | None = None,
+    *,
+    level: str = "info",
+    status: str = "success",
+    metadata: dict[str, object] | None = None,
+    source: str | None = None,
+    actor_type: str | None = None,
+    actor_id: str | None = None,
+) -> None:
+    payload = json.dumps(metadata) if metadata else None
     conn.execute(
         """
-        INSERT INTO activity_log (event_type, result, created_at)
-        VALUES (?, ?, ?)
+        INSERT INTO activity_log (
+            event_type,
+            level,
+            status,
+            result,
+            metadata,
+            source,
+            actor_type,
+            actor_id,
+            created_at
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
-        (event_type, result, time.time()),
+        (
+            str(event_type),
+            level,
+            status,
+            result,
+            payload,
+            source,
+            actor_type,
+            actor_id,
+            time.time(),
+        ),
     )
     conn.commit()

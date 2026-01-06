@@ -95,6 +95,10 @@ nav a:hover {
   gap: 16px;
 }
 
+.bulk-actions-grid {
+  grid-template-columns: 1fr;
+}
+
 .list {
   display: grid;
   gap: 12px;
