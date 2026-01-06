@@ -12,137 +12,24 @@
           or selected['Setting'] or selected['Spice'] or selected['StoryEngine']
           or selected['Tone'] or selected['Topic'] %}true{% else %}false{% endif %}"
       >
+        <p class="note">Select one or more per category. Leave blank to include all.</p>
         <div class="tag-form rec-namespace">
-          <div class="rec-group" data-rec-group>
-            <div class="rec-group-title">Genre</div>
-            <label class="rec-option">
-              <input type="radio" name="genre" value="" data-default-option {% if not selected["Genre"] %}checked{% endif %} />
-              Any
-            </label>
-            {% for tag in grouped["Genre"] %}
-              <label class="rec-option">
-                <input type="radio" name="genre" value="{{ tag['id'] }}" {% if selected["Genre"] == tag['id'] %}checked{% endif %} />
-                {{ tag['display_name'] }}
-              </label>
-            {% endfor %}
-          </div>
-          <div class="rec-group" data-rec-group>
-            <div class="rec-group-title">Pacing</div>
-            <label class="rec-option">
-              <input type="radio" name="pacing" value="" data-default-option {% if not selected["Pacing"] %}checked{% endif %} />
-              Any
-            </label>
-            {% for tag in grouped["Pacing"] %}
-              <label class="rec-option">
-                <input type="radio" name="pacing" value="{{ tag['id'] }}" {% if selected["Pacing"] == tag['id'] %}checked{% endif %} />
-                {{ tag['display_name'] }}
-              </label>
-            {% endfor %}
-          </div>
-          <div class="rec-group" data-rec-group>
-            <div class="rec-group-title">Reader</div>
-            <label class="rec-option">
-              <input type="radio" name="reader" value="" data-default-option {% if not selected["Reader"] %}checked{% endif %} />
-              Any
-            </label>
-            {% for tag in grouped["Reader"] %}
-              <label class="rec-option">
-                <input type="radio" name="reader" value="{{ tag['id'] }}" {% if selected["Reader"] == tag['id'] %}checked{% endif %} />
-                {{ tag['display_name'] }}
-              </label>
-            {% endfor %}
-          </div>
-          <div class="rec-group" data-rec-group>
-            <div class="rec-group-title">Romance</div>
-            <label class="rec-option">
-              <input type="radio" name="romance" value="" data-default-option {% if not selected["Romance"] %}checked{% endif %} />
-              Any
-            </label>
-            {% for tag in grouped["Romance"] %}
-              <label class="rec-option">
-                <input type="radio" name="romance" value="{{ tag['id'] }}" {% if selected["Romance"] == tag['id'] %}checked{% endif %} />
-                {{ tag['display_name'] }}
-              </label>
-            {% endfor %}
-          </div>
-          <div class="rec-group" data-rec-group>
-            <div class="rec-group-title">Scale</div>
-            <label class="rec-option">
-              <input type="radio" name="scale" value="" data-default-option {% if not selected["Scale"] %}checked{% endif %} />
-              Any
-            </label>
-            {% for tag in grouped["Scale"] %}
-              <label class="rec-option">
-                <input type="radio" name="scale" value="{{ tag['id'] }}" {% if selected["Scale"] == tag['id'] %}checked{% endif %} />
-                {{ tag['display_name'] }}
-              </label>
-            {% endfor %}
-          </div>
-          <div class="rec-group" data-rec-group>
-            <div class="rec-group-title">Series</div>
-            <label class="rec-option">
-              <input type="radio" name="series" value="" data-default-option {% if not selected["Series"] %}checked{% endif %} />
-              Any
-            </label>
-            {% for tag in grouped["Series"] %}
-              <label class="rec-option">
-                <input type="radio" name="series" value="{{ tag['id'] }}" {% if selected["Series"] == tag['id'] %}checked{% endif %} />
-                {{ tag['display_name'] }}
-              </label>
-            {% endfor %}
-          </div>
-          <div class="rec-group" data-rec-group>
-            <div class="rec-group-title">Setting</div>
-            <label class="rec-option">
-              <input type="radio" name="setting" value="" data-default-option {% if not selected["Setting"] %}checked{% endif %} />
-              Any
-            </label>
-            {% for tag in grouped["Setting"] %}
-              <label class="rec-option">
-                <input type="radio" name="setting" value="{{ tag['id'] }}" {% if selected["Setting"] == tag['id'] %}checked{% endif %} />
-                {{ tag['display_name'] }}
-              </label>
-            {% endfor %}
-          </div>
-          <div class="rec-group" data-rec-group>
-            <div class="rec-group-title">Spice</div>
-            <label class="rec-option">
-              <input type="radio" name="spice" value="" data-default-option {% if not selected["Spice"] %}checked{% endif %} />
-              Any
-            </label>
-            {% for tag in grouped["Spice"] %}
-              <label class="rec-option">
-                <input type="radio" name="spice" value="{{ tag['id'] }}" {% if selected["Spice"] == tag['id'] %}checked{% endif %} />
-                {{ tag['display_name'] }}
-              </label>
-            {% endfor %}
-          </div>
-          <div class="rec-group" data-rec-group>
-            <div class="rec-group-title">Story engine</div>
-            <label class="rec-option">
-              <input type="radio" name="storyengine" value="" data-default-option {% if not selected["StoryEngine"] %}checked{% endif %} />
-              Any
-            </label>
-            {% for tag in grouped["StoryEngine"] %}
-              <label class="rec-option">
-                <input type="radio" name="storyengine" value="{{ tag['id'] }}" {% if selected["StoryEngine"] == tag['id'] %}checked{% endif %} />
-                {{ tag['display_name'] }}
-              </label>
-            {% endfor %}
-          </div>
-          <div class="rec-group" data-rec-group>
-            <div class="rec-group-title">Tone</div>
-            <label class="rec-option">
-              <input type="radio" name="tone" value="" data-default-option {% if not selected["Tone"] %}checked{% endif %} />
-              Any
-            </label>
-            {% for tag in grouped["Tone"] %}
-              <label class="rec-option">
-                <input type="radio" name="tone" value="{{ tag['id'] }}" {% if selected["Tone"] == tag['id'] %}checked{% endif %} />
-                {{ tag['display_name'] }}
-              </label>
-            {% endfor %}
-          </div>
+          {% for ns in namespace_config %}
+            <div class="rec-group" data-rec-group>
+              <div class="rec-group-title">{{ ns['ui_label'] }}</div>
+              {% for tag in grouped[ns['tag_prefix']] %}
+                <label class="rec-option">
+                  <input
+                    type="checkbox"
+                    name="{{ ns['query_param'] }}"
+                    value="{{ tag['id'] }}"
+                    {% if tag['id'] in selected[ns['tag_prefix']] %}checked{% endif %}
+                  />
+                  {{ tag['display_name'] }}
+                </label>
+              {% endfor %}
+            </div>
+          {% endfor %}
           <div class="rec-group rec-group-topics" data-rec-group data-rec-topic>
             <div class="rec-group-title">Topics</div>
             <div class="tag-form">
@@ -305,13 +192,13 @@
 
     const updateClearState = () => {
       if (!clearButton || !recForm) return;
-      const inputs = recForm.querySelectorAll("input[type='radio']");
+      const inputs = recForm.querySelectorAll("input[type='checkbox']");
       const hasTopics = topicBadges
         ? topicBadges.querySelectorAll("input[name='topic_id']").length > 0
         : false;
       let hasSelection = hasTopics;
       inputs.forEach((input) => {
-        if (!hasSelection && input.checked && input.value) {
+        if (!hasSelection && input.checked) {
           hasSelection = true;
         }
       });
@@ -327,17 +214,19 @@
         if (isTopicGroup) {
           isActive = !!(topicBadges && topicBadges.querySelector("input[name='topic_id']"));
         } else {
-          const checked = group.querySelector("input[type='radio']:checked");
-          isActive = !!(checked && !checked.hasAttribute("data-default-option"));
+          const checked = group.querySelector("input[type='checkbox']:checked");
+          isActive = !!checked;
         }
         group.toggleAttribute("data-active", isActive);
       });
     };
 
     if (recForm) {
-      recForm.addEventListener("change", updateClearState);
+      recForm.addEventListener("change", () => {
         updateClearState();
         updateGroupHighlights();
+      });
+      updateClearState();
       updateGroupHighlights();
     }
 

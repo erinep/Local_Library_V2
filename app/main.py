@@ -4,7 +4,7 @@ from datetime import datetime
 from pathlib import Path
 
 from urllib.parse import quote_plus
-from fastapi import FastAPI, Form, HTTPException, Query, Request, Response
+from fastapi import FastAPI, Form, HTTPException, Request, Response
 from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -40,18 +40,19 @@ def _urlencode(value: object) -> str:
 
 templates.env.filters['urlencode'] = _urlencode
 
-RECOMMENDATION_NAMESPACES = [
-    "Genre",
-    "Pacing",
-    "Reader",
-    "Romance",
-    "Scale",
-    "Series",
-    "Setting",
-    "Spice",
-    "StoryEngine",
-    "Tone",
+TAG_NAMESPACE_CONFIG = [
+    {"tag_prefix": "Genre", "query_param": "genre", "ui_label": "Genre"},
+    {"tag_prefix": "Pacing", "query_param": "pacing", "ui_label": "Pacing"},
+    {"tag_prefix": "Reader", "query_param": "reader", "ui_label": "Reader"},
+    {"tag_prefix": "Romance", "query_param": "romance", "ui_label": "Romance"},
+    {"tag_prefix": "Scale", "query_param": "scale", "ui_label": "Scale"},
+    {"tag_prefix": "Series", "query_param": "series", "ui_label": "Series"},
+    {"tag_prefix": "Setting", "query_param": "setting", "ui_label": "Setting"},
+    {"tag_prefix": "Spice", "query_param": "spice", "ui_label": "Spice"},
+    {"tag_prefix": "StoryEngine", "query_param": "storyengine", "ui_label": "Story engine"},
+    {"tag_prefix": "Tone", "query_param": "tone", "ui_label": "Tone"},
 ]
+TAG_NAMESPACE_LIST = [entry["tag_prefix"] for entry in TAG_NAMESPACE_CONFIG]
 
 
 class ScanResult(BaseModel):
@@ -81,10 +82,6 @@ def startup() -> None:
     with get_connection() as conn:
         init_db(conn)
 
-
-@app.get("/health")
-def health() -> dict[str, str]:
-    return {"status": "ok"}
 
 
 @app.get("/favicon.ico")
@@ -195,34 +192,32 @@ def ui_summary() -> dict[str, object]:
 @app.get("/ui/recommendations")
 def ui_recommendations(
     request: Request,
-    genre: str | None = None,
-    pacing: str | None = None,
-    reader: str | None = None,
-    romance: str | None = None,
-    scale: str | None = None,
-    series: str | None = None,
-    setting: str | None = None,
-    spice: str | None = None,
-    storyengine: str | None = None,
-    tone: str | None = None,
-    topic_id: list[int] = Query(default=[]),
 ):
-    def _parse_int(value: str | None) -> int | None:
-        if value is None:
-            return None
-        stripped = value.strip()
-        return int(stripped) if stripped else None
+    def _unique_ids(values: list[int]) -> list[int]:
+        return list(dict.fromkeys(values))
 
-    genre_id = _parse_int(genre)
-    pacing_id = _parse_int(pacing)
-    reader_id = _parse_int(reader)
-    romance_id = _parse_int(romance)
-    scale_id = _parse_int(scale)
-    series_id = _parse_int(series)
-    setting_id = _parse_int(setting)
-    spice_id = _parse_int(spice)
-    storyengine_id = _parse_int(storyengine)
-    tone_id = _parse_int(tone)
+    def _parse_int_list(values: list[str]) -> list[int]:
+        parsed: list[int] = []
+        for value in values:
+            stripped = value.strip()
+            if not stripped:
+                continue
+            try:
+                parsed.append(int(stripped))
+            except ValueError:
+                continue
+        return parsed
+
+    query_params = request.query_params
+    namespace_inputs = {
+        entry["query_param"]: _parse_int_list(query_params.getlist(entry["query_param"]))
+        for entry in TAG_NAMESPACE_CONFIG
+    }
+    namespace_filters = {
+        entry["tag_prefix"]: _unique_ids(namespace_inputs[entry["query_param"]])
+        for entry in TAG_NAMESPACE_CONFIG
+    }
+    topic_ids = _unique_ids(_parse_int_list(query_params.getlist("topic_id")))
     with get_connection() as conn:
         tag_rows = conn.execute(
             """
@@ -232,7 +227,7 @@ def ui_recommendations(
             ORDER BY name
             """
         ).fetchall()
-        grouped: dict[str, list[dict[str, object]]] = {ns: [] for ns in RECOMMENDATION_NAMESPACES}
+        grouped: dict[str, list[dict[str, object]]] = {ns: [] for ns in TAG_NAMESPACE_LIST}
         topics: list[dict[str, object]] = []
         for row in tag_rows:
             name = str(row["name"])
@@ -246,38 +241,32 @@ def ui_recommendations(
                 grouped[namespace].append({"id": row["id"], "name": name, "display_name": value})
 
         selected = {
-            "Genre": genre_id,
-            "Pacing": pacing_id,
-            "Reader": reader_id,
-            "Romance": romance_id,
-            "Scale": scale_id,
-            "Series": series_id,
-            "Setting": setting_id,
-            "Spice": spice_id,
-            "StoryEngine": storyengine_id,
-            "Tone": tone_id,
-            "Topic": topic_id,
+            **namespace_filters,
+            "Topic": topic_ids,
         }
 
-        selected_tag_ids: list[int] = [
-            value for value in (
-                genre_id,
-                pacing_id,
-                reader_id,
-                romance_id,
-                scale_id,
-                series_id,
-                setting_id,
-                spice_id,
-                storyengine_id,
-                tone_id,
-            )
-            if value is not None
-        ]
-        selected_tag_ids.extend(topic_id)
+        selected_tag_ids = [tag_id for ids in namespace_filters.values() for tag_id in ids]
+        selected_tag_ids.extend(topic_ids)
 
         if selected_tag_ids:
             placeholders = ", ".join("?" for _ in selected_tag_ids)
+            having_clauses: list[str] = []
+            params: list[object] = [*selected_tag_ids]
+            for ids in namespace_filters.values():
+                if not ids:
+                    continue
+                namespace_placeholders = ", ".join("?" for _ in ids)
+                having_clauses.append(
+                    f"SUM(CASE WHEN bt.tag_id IN ({namespace_placeholders}) THEN 1 ELSE 0 END) > 0"
+                )
+                params.extend(ids)
+            if topic_ids:
+                topic_placeholders = ", ".join("?" for _ in topic_ids)
+                having_clauses.append(
+                    f"SUM(CASE WHEN bt.tag_id IN ({topic_placeholders}) THEN 1 ELSE 0 END) > 0"
+                )
+                params.extend(topic_ids)
+
             rows = conn.execute(
                 f"""
                 SELECT
@@ -290,10 +279,10 @@ def ui_recommendations(
                 INNER JOIN book_tags bt ON bt.book_id = b.id
                 WHERE bt.tag_id IN ({placeholders})
                 GROUP BY b.id
-                HAVING COUNT(DISTINCT bt.tag_id) = ?
+                HAVING {' AND '.join(having_clauses)}
                 ORDER BY a.name, b.title
                 """,
-                [*selected_tag_ids, len(selected_tag_ids)],
+                params,
             ).fetchall()
         else:
             rows = []
@@ -301,15 +290,20 @@ def ui_recommendations(
         label_map = {item["id"]: item["display_name"] for group in grouped.values() for item in group}
         topic_labels = {item["id"]: item["display_name"] for item in topics}
         summary_parts: list[str] = []
-        for key in RECOMMENDATION_NAMESPACES:
-            tag_id = selected.get(key)
-            if not tag_id:
+        label_lookup = {
+            entry["tag_prefix"]: entry["ui_label"]
+            for entry in TAG_NAMESPACE_CONFIG
+        }
+        for key in TAG_NAMESPACE_LIST:
+            tag_ids = namespace_filters.get(key, [])
+            if not tag_ids:
                 continue
-            label = label_map.get(tag_id)
-            if label:
-                summary_parts.append(f"{key}: {label}")
-        if topic_id:
-            names = [topic_labels.get(tid) for tid in topic_id if topic_labels.get(tid)]
+            names = [label_map.get(tag_id) for tag_id in tag_ids if label_map.get(tag_id)]
+            if names:
+                summary_label = label_lookup.get(key, key)
+                summary_parts.append(f"{summary_label}: {', '.join(names)}")
+        if topic_ids:
+            names = [topic_labels.get(tid) for tid in topic_ids if topic_labels.get(tid)]
             if names:
                 summary_parts.append(f"Topics: {', '.join(names)}")
         summary = "No filters selected." if not summary_parts else "Filters: " + " | ".join(summary_parts)
@@ -318,7 +312,7 @@ def ui_recommendations(
         "recommendations.html",
         {
             "request": request,
-            "namespaces": RECOMMENDATION_NAMESPACES,
+            "namespace_config": TAG_NAMESPACE_CONFIG,
             "grouped": grouped,
             "topics": topics,
             "selected": selected,
