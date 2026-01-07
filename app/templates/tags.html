@@ -7,7 +7,7 @@
     </div>
     <div class="card">
       <h3>Add Topics</h3>
-      <form class="tag-form" method="post" action="/ui/tags">
+      <form class="tag-form" method="post" action="/tags">
         <input class="input" type="text" name="tags" placeholder="Add topics, comma separated" />
         <button class="btn btn-outline btn-small" type="submit">Add</button>
       </form>
@@ -22,7 +22,7 @@
         {% for tag in tags %}
           <div class="list-item">
             <div>
-              <a href="/ui/books?tag_id={{ tag['id'] }}">{{ tag['name'] }}</a>
+              <a href="/books?tag_id={{ tag['id'] }}">{{ tag['name'] }}</a>
             </div>
             <span class="badge">{{ tag['book_count'] }} books</span>
           </div>

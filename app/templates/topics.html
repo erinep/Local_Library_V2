@@ -14,7 +14,7 @@
         {% for topic in topics %}
           <div class="list-item">
             <div>
-              <a href="/ui/books?tag_id={{ topic['id'] }}">{{ topic['display_name'] }}</a>
+              <a href="/books?tag_id={{ topic['id'] }}">{{ topic['display_name'] }}</a>
             </div>
             <span class="badge">{{ topic['book_count'] }} books</span>
           </div>

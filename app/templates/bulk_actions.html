@@ -25,7 +25,7 @@
         Download a CSV snapshot of the library. The file includes book id, title, author, and a comma-separated list
         of tags for each book.
       </p>
-      <a class="btn btn-outline" href="/ui/bulk-actions/export">Download CSV</a>
+      <a class="btn btn-outline" href="/bulk-actions/export">Download CSV</a>
     </div>
     <div class="card">
       <h3>Import tags from CSV</h3>
@@ -470,7 +470,7 @@
     const bulkLoadBooks = async () => {
       bulkSetStatus("Loading books...");
       try {
-        const response = await fetch("/ui/bulk-actions/books");
+        const response = await fetch("/bulk-actions/books");
         if (!response.ok) {
           throw new Error("Failed to load books.");
         }
@@ -541,7 +541,7 @@
       const formData = new FormData();
       formData.set("tags", tags.join(", "));
       try {
-        const response = await fetch(`/ui/books/${bookId}/tags`, {
+        const response = await fetch(`/books/${bookId}/tags`, {
           method: "POST",
           body: formData,
         });
@@ -596,7 +596,7 @@
         bulkSetStatus("Bulk tagging complete.");
         bulkClearResults();
         try {
-          await fetch("/ui/bulk-actions/complete", {
+          await fetch("/bulk-actions/complete", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ status: "completed", processed: bulkIndex, total: bulkBooks.length }),
@@ -616,7 +616,7 @@
       bulkStopped = true;
       bulkRunning = false;
       try {
-        fetch("/ui/bulk-actions/complete", {
+        fetch("/bulk-actions/complete", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ status: "stopped", processed: bulkIndex, total: bulkBooks.length }),
@@ -665,7 +665,7 @@
         cleanTagsButton.disabled = true;
         cleanTagsStatus.textContent = "Cleaning...";
         try {
-          const response = await fetch("/ui/bulk-actions/cleanup-tags", { method: "POST" });
+          const response = await fetch("/bulk-actions/cleanup-tags", { method: "POST" });
           if (!response.ok) {
             throw new Error("Cleanup failed.");
           }
@@ -686,7 +686,7 @@
         clearTagsButton.disabled = true;
         clearTagsStatus.textContent = "Clearing...";
         try {
-          const response = await fetch("/ui/bulk-actions/clear-tags", { method: "POST" });
+          const response = await fetch("/bulk-actions/clear-tags", { method: "POST" });
           if (!response.ok) {
             throw new Error("Clear failed.");
           }
@@ -740,7 +740,7 @@
         csvSetStatus("Importing tags...");
         csvSetValidation("");
         try {
-          const response = await fetch("/ui/bulk-actions/import-tags", {
+          const response = await fetch("/bulk-actions/import-tags", {
             method: "POST",
             body: formData,
           });

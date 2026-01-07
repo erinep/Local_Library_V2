@@ -5,7 +5,7 @@
       <h2>Recommendations</h2>
       <form
         method="get"
-        action="/ui/recommendations#results"
+        action="/recommendations#results"
         class="recommendations-form"
         data-active="{% if selected['Genre'] or selected['Pacing'] or selected['Reader']
           or selected['Romance'] or selected['Scale'] or selected['Series']
@@ -73,7 +73,7 @@
           <button class="btn btn-outline btn-small" type="submit">Search</button>
           <a
             class="btn btn-small"
-            href="/ui/recommendations"
+            href="/recommendations"
             data-clear-filters
             {% if not selected["Genre"] and not selected["Pacing"] and not selected["Reader"] and not selected["Romance"]
               and not selected["Scale"] and not selected["Series"] and not selected["Setting"] and not selected["Spice"]
@@ -96,7 +96,7 @@
         {% for book in books %}
           <div class="list-item">
             <div>
-              <a href="/ui/books/{{ book['id'] }}">{{ book['title'] }}</a><br />
+              <a href="/books/{{ book['id'] }}">{{ book['title'] }}</a><br />
               <small>{{ book['author'] or "Unknown author" }}</small>
             </div>
             <span class="badge">{{ book['file_count'] }} files</span>
