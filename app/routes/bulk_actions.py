@@ -232,9 +232,15 @@ def build_bulk_actions_router(
             raise HTTPException(status_code=400, detail="Select at least one tag column.")
 
         namespace_lookup = {name.lower() for name in TAG_NAMESPACE_LIST}
-        unknown_namespaces = [
+        namespace_lookup.add("topic")
+        invalid_namespaces = [
             name for name in selected_columns if name.strip().lower() not in namespace_lookup
         ]
+        if invalid_namespaces:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Unknown tag namespaces: {', '.join(invalid_namespaces)}",
+            )
 
         tag_indices: list[tuple[int, str]] = []
         for column in selected_columns:
@@ -314,7 +320,6 @@ def build_bulk_actions_router(
                     "missing_book_ids": sorted(missing_book_ids),
                     "invalid_rows": invalid_rows,
                     "namespaces": selected_columns,
-                    "unknown_namespaces": unknown_namespaces,
                 },
                 source="bulk_tag_import",
             )
@@ -326,7 +331,6 @@ def build_bulk_actions_router(
             tags_added=tags_added,
             missing_book_ids=sorted(missing_book_ids),
             invalid_rows=invalid_rows,
-            unknown_namespaces=unknown_namespaces,
         )
 
     return router

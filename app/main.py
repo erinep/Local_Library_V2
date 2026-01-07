@@ -46,15 +46,9 @@ templates.env.filters["urlencode"] = _urlencode
 
 TAG_NAMESPACE_CONFIG = [
     {"tag_prefix": "Genre", "query_param": "genre", "ui_label": "Genre"},
-    {"tag_prefix": "Pacing", "query_param": "pacing", "ui_label": "Pacing"},
     {"tag_prefix": "Reader", "query_param": "reader", "ui_label": "Reader"},
     {"tag_prefix": "Romance", "query_param": "romance", "ui_label": "Romance"},
-    {"tag_prefix": "Scale", "query_param": "scale", "ui_label": "Scale"},
-    {"tag_prefix": "Series", "query_param": "series", "ui_label": "Series"},
     {"tag_prefix": "Setting", "query_param": "setting", "ui_label": "Setting"},
-    {"tag_prefix": "Spice", "query_param": "spice", "ui_label": "Spice"},
-    {"tag_prefix": "StoryEngine", "query_param": "storyengine", "ui_label": "Story engine"},
-    {"tag_prefix": "Tone", "query_param": "tone", "ui_label": "Tone"},
 ]
 TAG_NAMESPACE_LIST = [entry["tag_prefix"] for entry in TAG_NAMESPACE_CONFIG]
 

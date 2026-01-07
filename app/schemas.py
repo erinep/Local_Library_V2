@@ -36,4 +36,3 @@ class BulkTagImportResult(BaseModel):
     tags_added: int
     missing_book_ids: list[int]
     invalid_rows: int
-    unknown_namespaces: list[str]
