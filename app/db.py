@@ -17,6 +17,8 @@ class ActivityEvent(str, Enum):
     BOOK_TAGS_UPDATED = "book_tags_updated"
     BULK_TAGGING_STARTED = "bulk_tagging_started"
     BULK_TAGGING_COMPLETED = "bulk_tagging_completed"
+    BULK_TAG_IMPORT = "bulk_tag_import"
+    CLEAR_ALL_TAGS = "clear_all_tags"
 
 
 def get_connection(db_path: Path | None = None) -> sqlite3.Connection:
@@ -213,6 +215,16 @@ def clean_unused_tags(conn: sqlite3.Connection) -> int:
     )
     conn.commit()
     return cur.rowcount
+
+
+def clear_all_tags(conn: sqlite3.Connection) -> tuple[int, int]:
+    cur = conn.cursor()
+    cur.execute("DELETE FROM book_tags")
+    removed_links = cur.rowcount
+    cur.execute("DELETE FROM tags")
+    removed_tags = cur.rowcount
+    conn.commit()
+    return removed_links, removed_tags
 
 
 def get_book_tags(conn: sqlite3.Connection, book_id: int) -> list[sqlite3.Row]:
