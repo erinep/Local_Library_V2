@@ -20,7 +20,7 @@ from .db import (
     remove_tag_from_book,
     upsert_files,
 )
-from .metadataProvider import GoogleBooksProvider
+from .metadataProvider import get_default_provider
 from .routes.api import build_api_router
 from .routes.bulk_actions import build_bulk_actions_router
 from .routes.ui import build_ui_router
@@ -29,7 +29,7 @@ from .services.ingest import infer_book_id
 from .services.ui_helpers import get_dashboard_data, urlencode_value
 
 app = FastAPI(title="Audiobook Library Backend")
-_books_provider = GoogleBooksProvider()
+_books_provider = get_default_provider()
 
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
 templates = Jinja2Templates(directory="app/templates")
