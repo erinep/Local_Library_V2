@@ -1,6 +1,5 @@
 {
   "library_roots": [
-    "E:/Audio/audiobooks/_fiction",
     "E:/Audio/audiobooks/_nonfiction"
   ],
   "allowed_extensions": [
@@ -14,5 +13,5 @@
     "node_modules",
     "__pycache__"
   ],
-  "db_name": "testing.db"
+  "db_name": "testing-1.db"
 }

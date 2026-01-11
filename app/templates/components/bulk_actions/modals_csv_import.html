@@ -1,0 +1,30 @@
+{% call modal.modal(
+    "csv-import",
+    "Import Tags From CSV",
+    extra_attrs='data-namespaces="' ~ (tag_namespaces | join(",")) ~ '"'
+  )
+%}
+  <p class="note" data-csv-status>Select a CSV file to begin.</p>
+  <div class="card" style="margin-bottom: 1rem;">
+    <label class="note" for="csv-import-file">CSV file</label>
+    <input id="csv-import-file" type="file" accept=".csv,text/csv" data-csv-file />
+  </div>
+  <div class="card" data-csv-columns hidden>
+    <div style="margin-bottom: 0.75rem;">
+      <label class="note" for="csv-book-id-column">Book ID column</label>
+      <select id="csv-book-id-column" data-csv-book-id></select>
+    </div>
+    <div>
+      <div class="note" style="margin-bottom: 0.25rem;">Tag columns</div>
+      <div class="list" data-csv-tag-columns></div>
+      <small class="note">
+        Tags are created as <code>Header:Cell</code>. Cells can contain comma-separated values.
+      </small>
+    </div>
+  </div>
+  <div class="tag-form" style="margin-top: 1rem;">
+    <button class="btn btn-outline btn-small" type="button" data-csv-validate>Next</button>
+    <button class="btn btn-small" type="button" data-csv-import-submit disabled>Import tags</button>
+  </div>
+  <p class="note" data-csv-validation></p>
+{% endcall %}

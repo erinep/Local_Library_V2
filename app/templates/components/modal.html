@@ -1,0 +1,26 @@
+{% macro modal(modal_id, title, extra_attrs="") -%}
+  <div class="modal" data-modal-id="{{ modal_id }}" hidden {{ extra_attrs | safe }}>
+    <div class="modal-overlay" data-modal-close></div>
+    <div
+      class="modal-panel"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="{{ modal_id }}-title"
+    >
+      <div class="modal-header">
+        <h3 id="{{ modal_id }}-title">{{ title }}</h3>
+        <button
+          class="modal-close"
+          type="button"
+          data-modal-close
+          aria-label="Close {{ title | lower }}"
+        >
+          &times;
+        </button>
+      </div>
+      <div class="modal-body">
+        {{ caller() }}
+      </div>
+    </div>
+  </div>
+{%- endmacro %}

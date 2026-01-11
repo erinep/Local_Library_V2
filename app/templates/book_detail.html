@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% import "components/modal.html" as modal %}
 {% block content %}
   <section class="hero">
     <div class="card">
@@ -91,25 +92,16 @@
     </div>
   </section>
 
-  <div class="modal" data-search-modal hidden>
-    <div class="modal-overlay" data-modal-close></div>
-    <div class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="searchModalTitle">
-      <div class="modal-header">
-        <h3 id="searchModalTitle">Google Books Results</h3>
-        <button class="modal-close" type="button" data-modal-close aria-label="Close search results">&times;</button>
-      </div>
-      <div class="modal-body">
-        <p class="note" data-search-status>Loading results...</p>
-        <div class="tag-list" data-search-tags></div>
-        <button class="btn btn-outline btn-small" type="button" data-apply-tags disabled>Add tags to book</button>
-        <div class="list" data-search-results></div>
-      </div>
-    </div>
-  </div>
+  {% call modal.modal("search-books", "Google Books Results") %}
+    <p class="note" data-search-status>Loading results...</p>
+    <div class="tag-list" data-search-tags></div>
+    <button class="btn btn-outline btn-small" type="button" data-apply-tags disabled>Add tags to book</button>
+    <div class="list" data-search-results></div>
+  {% endcall %}
 
   <script>
     const searchButton = document.querySelector("[data-search-books]");
-    const modal = document.querySelector("[data-search-modal]");
+    const modal = document.querySelector("[data-modal-id='search-books']");
     const statusLine = document.querySelector("[data-search-status]");
     const resultsList = document.querySelector("[data-search-results]");
     const tagsList = document.querySelector("[data-search-tags]");
@@ -118,13 +110,15 @@
     let currentTags = [];
 
     const openModal = () => {
-      modal.removeAttribute("hidden");
-      document.body.style.overflow = "hidden";
+      if (window.ModalController) {
+        window.ModalController.open("search-books");
+      }
     };
 
     const closeModal = () => {
-      modal.setAttribute("hidden", "");
-      document.body.style.overflow = "";
+      if (window.ModalController) {
+        window.ModalController.close("search-books");
+      }
       setStatus("");
       currentTags = [];
       applyTagsButton.disabled = true;
@@ -269,7 +263,11 @@
     });
 
     closeButtons.forEach((button) => {
-      button.addEventListener("click", closeModal);
+      button.addEventListener("click", (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        closeModal();
+      });
     });
 
     document.addEventListener("keydown", (event) => {

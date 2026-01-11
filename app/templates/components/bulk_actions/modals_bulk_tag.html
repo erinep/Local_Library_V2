@@ -1,0 +1,22 @@
+{% call modal.modal("bulk-tags", "Bulk Tagging") %}
+  <p class="note" data-bulk-status>Loading books...</p>
+  <div>
+    <strong data-bulk-title>Title</strong>
+    <div class="note" data-bulk-author></div>
+  </div>
+  <div class="tag-form">
+    <button class="btn btn-outline btn-small" type="button" data-bulk-search>Search tags</button>
+    <button class="btn btn-outline btn-small" type="button" data-bulk-skip>Skip book</button>
+    <button class="btn btn-small" type="button" data-bulk-add disabled>Add tags to book</button>
+    <button class="btn btn-outline btn-small" type="button" data-bulk-stop>Stop</button>
+  </div>
+  <div>
+    <small class="note">Current tags</small>
+    <div class="tag-list" data-bulk-current-tags></div>
+  </div>
+  <div>
+    <small class="note">Proposed tags</small>
+    <div class="tag-list" data-bulk-tags></div>
+  </div>
+  <div class="list" data-bulk-results></div>
+{% endcall %}

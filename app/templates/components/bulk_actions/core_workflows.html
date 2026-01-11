@@ -1,0 +1,49 @@
+<div class="card bulk-actions-section">
+  <h3>Core workflows</h3>
+  <p class="note">Primary tasks for maintaining and enriching the library.</p>
+  <div class="list">
+    <div class="list-item">
+      <div class="bulk-actions-info">
+        <h4>Scan library</h4>
+        <p class="note">Index files and refresh totals.</p>
+      </div>
+      <div class="bulk-actions-action">
+        <button class="btn" type="button" data-scan>Run scan</button>
+        <p class="note" id="scan-status">Idle</p>
+      </div>
+    </div>
+    <div class="list-item">
+      <div class="bulk-actions-info">
+        <h4>Bulk tag books</h4>
+        <p class="note">Search Google Books for each title and apply tags.</p>
+      </div>
+      <div class="bulk-actions-action">
+        <button class="btn btn-outline" type="button" data-bulk-tags>Start bulk tagging</button>
+      </div>
+    </div>
+    <div class="list-item">
+      <div class="bulk-actions-info">
+        <h4>Normalize authors</h4>
+        <p class="note">Generate normalized author names for matching.</p>
+      </div>
+      <div class="bulk-actions-action">
+        <button class="btn btn-outline" type="button" data-normalize-authors>
+          Normalize authors
+        </button>
+        <p class="note" id="normalize-authors-status">Idle</p>
+      </div>
+    </div>
+    <div class="list-item">
+      <div class="bulk-actions-info">
+        <h4>Normalize titles</h4>
+        <p class="note">Generate normalized titles for matching.</p>
+      </div>
+      <div class="bulk-actions-action">
+        <button class="btn btn-outline" type="button" data-normalize-titles>
+          Normalize titles
+        </button>
+        <p class="note" id="normalize-titles-status">Idle</p>
+      </div>
+    </div>
+  </div>
+</div>
