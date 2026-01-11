@@ -20,6 +20,8 @@ class BookTagSummary(BaseModel):
     book_id: int
     title: str
     author: str | None = None
+    normalized_title: str | None = None
+    normalized_author: str | None = None
     tags: list[str]
 
 

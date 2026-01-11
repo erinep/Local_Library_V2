@@ -28,6 +28,7 @@
   const bulkStatus = bulkModal ? bulkModal.querySelector("[data-bulk-status]") : null;
   const bulkTitle = bulkModal ? bulkModal.querySelector("[data-bulk-title]") : null;
   const bulkAuthor = bulkModal ? bulkModal.querySelector("[data-bulk-author]") : null;
+  const bulkSearchParams = bulkModal ? bulkModal.querySelector("[data-bulk-search-params]") : null;
   const bulkCurrentTags = bulkModal ? bulkModal.querySelector("[data-bulk-current-tags]") : null;
   const bulkResults = bulkModal ? bulkModal.querySelector("[data-bulk-results]") : null;
   const bulkTagsPreview = bulkModal ? bulkModal.querySelector("[data-bulk-tags]") : null;
@@ -184,6 +185,14 @@
     const book = bulkBooks[bulkIndex];
     if (bulkTitle) bulkTitle.textContent = book.title || "Untitled";
     if (bulkAuthor) bulkAuthor.textContent = book.author || "Unknown author";
+    if (bulkSearchParams) {
+      const title = book.normalized_title || book.title || "";
+      const author = book.normalized_author || book.author || "";
+      const parts = [];
+      if (title) parts.push(`Title: ${title}`);
+      if (author) parts.push(`Author: ${author}`);
+      bulkSearchParams.textContent = parts.length ? `Search params: ${parts.join(" | ")}` : "";
+    }
     bulkRenderCurrentTags(book.tags);
     bulkClearResults();
     bulkSetStatus("Search tags or skip this book.");
@@ -211,15 +220,17 @@
 
   const bulkSearchForBook = async (book) => {
     if (!book) return [];
-    if (!book.title && !book.author) {
+    if (!book.title && !book.author && !book.normalized_title && !book.normalized_author) {
       bulkSetStatus("Missing title and author. Skip this book.");
       return [];
     }
     bulkSetStatus("Searching Google Books...");
     try {
       const params = new URLSearchParams();
-      if (book.title) params.set("title", book.title);
-      if (book.author) params.set("author", book.author);
+      const title = book.normalized_title || book.title;
+      const author = book.normalized_author || book.author;
+      if (title) params.set("title", title);
+      if (author) params.set("author", author);
       const response = await fetch(`/search?${params.toString()}`);
       if (!response.ok) {
         throw new Error("Search failed.");

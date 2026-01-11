@@ -52,6 +52,8 @@ def fetch_books_with_authors_and_tags(conn: sqlite3.Connection) -> list[sqlite3.
             b.id AS book_id,
             b.title AS title,
             a.name AS author,
+            b.normalized_title AS normalized_title,
+            a.normalized_author AS normalized_author,
             t.name AS tag_name
         FROM books b
         LEFT JOIN authors a ON a.id = b.author_id
@@ -241,7 +243,9 @@ def fetch_book_detail(conn: sqlite3.Connection, book_id: int) -> sqlite3.Row | N
             b.title,
             b.path,
             a.name AS author,
-            b.author_id AS author_id
+            b.author_id AS author_id,
+            b.normalized_title,
+            a.normalized_author
         FROM books b
         LEFT JOIN authors a ON a.id = b.author_id
         WHERE b.id = ?

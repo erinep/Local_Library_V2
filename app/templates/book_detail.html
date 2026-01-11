@@ -19,8 +19,8 @@
         type="button"
         data-search-books
         data-modal-open="search-books"
-        data-title="{{ book['title'] }}"
-        data-author="{{ book['author'] or '' }}"
+        data-title="{{ book['normalized_title'] }}"
+        data-author="{{ book['normalized_author'] or '' }}"
         data-book-id="{{ book['id'] }}"
       >
         Search Google Books
@@ -95,6 +95,7 @@
 
   {% call modal.modal("search-books", "Google Books Results") %}
     <p class="note" data-search-status>Loading results...</p>
+    <p class="note" data-search-params></p>
     <div class="tag-list" data-search-tags></div>
     <button class="btn btn-outline btn-small" type="button" data-apply-tags disabled>Add tags to book</button>
     <div class="list" data-search-results></div>

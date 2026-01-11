@@ -6,6 +6,7 @@
     const statusLine = document.querySelector("[data-search-status]");
     const resultsList = document.querySelector("[data-search-results]");
     const tagsList = document.querySelector("[data-search-tags]");
+    const searchParams = document.querySelector("[data-search-params]");
     const applyTagsButton = searchModal.querySelector("[data-apply-tags]");
     let currentTags = [];
 
@@ -126,6 +127,12 @@
         }
         if (author) {
         params.set("author", author);
+        }
+        if (searchParams) {
+        const parts = [];
+        if (title) parts.push(`Title: ${title}`);
+        if (author) parts.push(`Author: ${author}`);
+        searchParams.textContent = parts.length ? `Search params: ${parts.join(" | ")}` : "";
         }
         setStatus("Loading results...");
         try {

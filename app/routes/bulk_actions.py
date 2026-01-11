@@ -50,6 +50,8 @@ def build_bulk_actions_router(
                     book_id=book_id,
                     title=row["title"],
                     author=row["author"],
+                    normalized_title=row["normalized_title"],
+                    normalized_author=row["normalized_author"],
                     tags=[],
                 )
                 books[book_id] = entry

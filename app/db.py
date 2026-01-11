@@ -7,6 +7,7 @@ from typing import Iterable
 import time
 
 from .config import load_config
+from .services.normalization import normalize_author, normalize_title
 
 
 class ActivityEvent(str, Enum):
@@ -113,12 +114,13 @@ def upsert_files(conn: sqlite3.Connection, rows: Iterable[tuple[str, int, float,
 
 
 def get_or_create_author(conn: sqlite3.Connection, name: str) -> int:
+    normalized = normalize_author(name)
     conn.execute(
         """
-        INSERT OR IGNORE INTO authors (name, created_at)
-        VALUES (?, ?)
+        INSERT OR IGNORE INTO authors (name, created_at, normalized_author)
+        VALUES (?, ?, ?)
         """,
-        (name, time.time()),
+        (name, time.time(), normalized),
     )
     row = conn.execute("SELECT id FROM authors WHERE name = ?", (name,)).fetchone()
     if row is None:
@@ -127,12 +129,13 @@ def get_or_create_author(conn: sqlite3.Connection, name: str) -> int:
 
 
 def get_or_create_book(conn: sqlite3.Connection, title: str, author_id: int | None, path: str) -> int:
+    normalized = normalize_title(title)
     conn.execute(
         """
-        INSERT OR IGNORE INTO books (title, author_id, path, created_at)
-        VALUES (?, ?, ?, ?)
+        INSERT OR IGNORE INTO books (title, author_id, path, created_at, normalized_title)
+        VALUES (?, ?, ?, ?, ?)
         """,
-        (title, author_id, path, time.time()),
+        (title, author_id, path, time.time(), normalized),
     )
     row = conn.execute("SELECT id FROM books WHERE path = ?", (path,)).fetchone()
     if row is None:
