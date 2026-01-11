@@ -13,7 +13,7 @@ At a high level, the system consists of the following components:
 - Tag-driven search and recommendations tools
 - Bulk data management workflows
 
-## Library Ingestion
+### Library Ingestion
 
 The local file system is treated as the source of truth.
 
@@ -41,7 +41,7 @@ root/
 └── ...
 ```
 
-## Database
+### Database
 
 The backend uses SQLite as a lightweight relational store.
 
@@ -53,13 +53,13 @@ Core relationships include:
 
 Tags are stored as normalized records and linked to books through join tables. This allows tags to be added, removed, or replaced independently of book records.
 
-## 3. Tag-driven Search and Recommendations
+### Tag-driven Search and Recommendations
 
 All tags are stored internally using a `namespace:value` format.
 
 Namespaces determine how tags are interpreted and how they participate in filtering, clustering, and recommendation scoring.
 
-### Constrained Namespaces
+#### Constrained Namespaces
 
 Some namespaces are intentionally limited and controlled. These are used for structured clustering and higher-weight recommendation signals.
 
@@ -70,7 +70,7 @@ Examples include:
 - `Setting:*`
 - `ReadingExperience:*`
 
-### Topics Namespace
+#### Topics Namespace
 
 The `topics:*` namespace is open-ended.
 
@@ -79,11 +79,11 @@ The `topics:*` namespace is open-ended.
 
 Topic tags are lower-weight individually and are primarily useful in aggregate. This separation allows structured clustering via constrained namespaces while retaining detailed thematic information through topics.
 
-## 4. Bulk Metadata Tools
+### Bulk Metadata Tools
 
 Bulk operations are supported to allow large-scale changes to the tag map.
 
-### Export
+#### Export
 
 The system can export a CSV snapshot of the library containing:
 
@@ -94,7 +94,7 @@ The system can export a CSV snapshot of the library containing:
 
 The exported file is intended for editing in spreadsheet tools.
 
-### Tag Import
+#### Tag Import
 
 Edited CSV files can be re-imported to apply bulk updates.
 
