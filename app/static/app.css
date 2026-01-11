@@ -345,21 +345,6 @@ nav a:hover {
   color: var(--muted);
 }
 
-.recommendations-form .note-active {
-  display: none;
-}
-
-.recommendations-form[data-active="true"] .note-active {
-  display: block;
-  border: 1px solid rgba(31, 111, 91, 0.3);
-  background: rgba(31, 111, 91, 0.08);
-  padding: 10px 12px;
-  border-radius: 10px;
-}
-
-.recommendations-form[data-active="true"] .input {
-  border-color: rgba(31, 111, 91, 0.4);
-}
 
 .recommendations-form .tag-form {
   align-items: flex-end;

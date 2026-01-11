@@ -1,0 +1,20 @@
+<section class="section" id="results">
+  <div class="card">
+    <h3>Matches</h3>
+    <p class="note">{{ summary }}</p>
+    <p class="note">{{ books | length }} results</p>
+    <div class="list">
+      {% for book in books %}
+        <div class="list-item">
+          <div>
+            <a href="/books/{{ book['id'] }}">{{ book['title'] }}</a><br />
+            <small>{{ book['author'] or "Unknown author" }}</small>
+          </div>
+          <span class="badge">{{ book['file_count'] }} files</span>
+        </div>
+      {% else %}
+        <p class="note">No matching books yet.</p>
+      {% endfor %}
+    </div>
+  </div>
+</section>

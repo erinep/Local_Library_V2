@@ -1,0 +1,78 @@
+<section class="hero">
+  <div class="card">
+    <h2>Recommendations</h2>
+    <form
+      method="get"
+      action="/recommendations#results"
+      class="recommendations-form"
+    >
+      <p class="note">Select one or more per category. Leave blank to include all.</p>
+      <div class="tag-form rec-namespace">
+        {% for ns in namespace_config %}
+          <div class="rec-group" data-rec-group>
+            <div class="rec-group-title">{{ ns['ui_label'] }}</div>
+            {% for tag in grouped[ns['tag_prefix']] %}
+              <label class="rec-option">
+                <input
+                  type="checkbox"
+                  name="{{ ns['query_param'] }}"
+                  value="{{ tag['id'] }}"
+                  {% if tag['id'] in selected[ns['tag_prefix']] %}checked{% endif %}
+                />
+                {{ tag['display_name'] }}
+              </label>
+            {% endfor %}
+          </div>
+        {% endfor %}
+        <div class="rec-group rec-group-topics" data-rec-group data-rec-topic>
+          <div class="rec-group-title">Topics</div>
+          <div class="tag-form">
+            <input
+              class="input"
+              type="text"
+              list="topic-options"
+              name="topic_query"
+              placeholder="Search topics"
+              autocomplete="off"
+              data-topic-input
+            />
+            <button class="btn btn-outline btn-small" type="button" data-topic-add>Add</button>
+          </div>
+          <div class="topic-suggest" data-topic-suggest hidden>
+            {% for tag in topics %}
+              <button
+                class="topic-suggest-item"
+                type="button"
+                data-topic-id="{{ tag['id'] }}"
+                data-topic-label="{{ tag['display_name'] }}"
+              >
+                {{ tag['display_name'] }}
+              </button>
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+      <div class="tag-list tag-list-topics" data-topic-badges>
+        {% for tag in topics %}
+          {% if tag['id'] in selected["Topic"] %}
+            <div class="tag-pill" data-topic-id="{{ tag['id'] }}">
+              <span>{{ tag['display_name'] }}</span>
+              <button class="tag-remove" type="button" aria-label="Remove topic {{ tag['display_name'] }}">&times;</button>
+              <input type="hidden" name="topic_id" value="{{ tag['id'] }}" />
+            </div>
+          {% endif %}
+        {% endfor %}
+      </div>
+      <div class="tag-form">
+        <button class="btn btn-outline btn-small" type="submit">Search</button>
+        <a
+          class="btn btn-small"
+          href="/recommendations"
+        >
+          Clear
+        </a>
+      </div>
+      <p class="note note-active">Active filters applied.</p>
+    </form>
+  </div>
+</section>
