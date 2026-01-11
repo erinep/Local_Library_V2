@@ -43,10 +43,16 @@ def build_ui_router(
     @router.get("/")
     def ui_dashboard(request: Request):
         """Render the dashboard with totals and recent activity."""
-        totals, formatted_activity = get_dashboard_data()
+        totals, formatted_activity, charts = get_dashboard_data()
         return templates.TemplateResponse(
             "dashboard.html",
-            {"request": request, "totals": totals, "issues": [], "activity": formatted_activity},
+            {
+                "request": request,
+                "totals": totals,
+                "issues": [],
+                "activity": formatted_activity,
+                "charts": charts,
+            },
         )
 
     @router.get("/favicon.ico")
@@ -68,8 +74,8 @@ def build_ui_router(
     @router.get("/summary")
     def ui_summary() -> dict[str, object]:
         """Return summary data for dashboard polling."""
-        totals, formatted_activity = get_dashboard_data()
-        return {"totals": dict(totals), "activity": formatted_activity}
+        totals, formatted_activity, charts = get_dashboard_data()
+        return {"totals": dict(totals), "activity": formatted_activity, "charts": charts}
 
     @router.get("/recommendations")
     def ui_recommendations(request: Request):

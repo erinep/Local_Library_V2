@@ -95,6 +95,57 @@ nav a:hover {
   gap: 16px;
 }
 
+.chart-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.chart {
+  margin-top: 12px;
+  display: grid;
+  gap: 10px;
+}
+
+.chart-row {
+  display: grid;
+  grid-template-columns: minmax(120px, 1fr) 2fr auto;
+  gap: 10px;
+  align-items: center;
+}
+
+.chart-label {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.chart-bar {
+  position: relative;
+  height: 10px;
+  border-radius: 999px;
+  background: #efe5d6;
+  border: 1px solid var(--line);
+  overflow: hidden;
+}
+
+.chart-bar span {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--accent), #2f8f72);
+  min-width: 8px;
+}
+
+.chart-value {
+  min-width: 32px;
+  text-align: right;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--muted);
+}
+
 .bulk-actions-grid {
   grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
 }
@@ -573,6 +624,15 @@ nav a:hover {
   }
 
   .bulk-actions-action .note {
+    text-align: left;
+  }
+
+  .chart-row {
+    grid-template-columns: 1fr;
+    gap: 6px;
+  }
+
+  .chart-value {
     text-align: left;
   }
 }

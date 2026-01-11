@@ -31,6 +31,41 @@ def fetch_dashboard_totals(conn: sqlite3.Connection) -> sqlite3.Row:
     ).fetchone()
 
 
+def fetch_books_per_author(conn: sqlite3.Connection, limit: int = 10) -> list[sqlite3.Row]:
+    """Fetch book counts per author for the dashboard."""
+    return conn.execute(
+        """
+        SELECT
+            a.name,
+            COUNT(b.id) AS book_count
+        FROM authors a
+        LEFT JOIN books b ON b.author_id = a.id
+        GROUP BY a.id
+        ORDER BY book_count DESC, a.name
+        LIMIT ?
+        """,
+        (limit,),
+    ).fetchall()
+
+
+def fetch_books_per_tag(conn: sqlite3.Connection, limit: int = 10) -> list[sqlite3.Row]:
+    """Fetch book counts per tag for the dashboard (excluding topics)."""
+    return conn.execute(
+        """
+        SELECT
+            t.name,
+            COUNT(bt.book_id) AS book_count
+        FROM tags t
+        LEFT JOIN book_tags bt ON bt.tag_id = t.id
+        WHERE t.name NOT LIKE 'topic:%'
+        GROUP BY t.id
+        ORDER BY book_count DESC, t.name
+        LIMIT ?
+        """,
+        (limit,),
+    ).fetchall()
+
+
 def fetch_recent_activity(conn: sqlite3.Connection, limit: int = 8) -> list[sqlite3.Row]:
     """Fetch recent activity for app/main.py."""
     return conn.execute(

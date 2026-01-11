@@ -14,6 +14,51 @@
   </section>
 
   <section class="section">
+    <div class="card chart-card">
+      <div class="chart-header">
+        <div>
+          <h3>Books per author</h3>
+          <small>Top 10 authors by count</small>
+        </div>
+      </div>
+      <div class="chart">
+        {% for row in charts["authors"]["items"] %}
+          <div class="chart-row">
+            <span class="chart-label">{{ row["name"] }}</span>
+            <div class="chart-bar">
+              <span style="width: {{ row["percent"] }}%"></span>
+            </div>
+            <span class="chart-value">{{ row["count"] }}</span>
+          </div>
+        {% else %}
+          <p class="note">No authors found yet.</p>
+        {% endfor %}
+      </div>
+    </div>
+    <div class="card chart-card">
+      <div class="chart-header">
+        <div>
+          <h3>Books per tag</h3>
+          <small>Top 10 tags by count</small>
+        </div>
+      </div>
+      <div class="chart">
+        {% for row in charts["tags"]["items"] %}
+          <div class="chart-row">
+            <span class="chart-label">{{ row["name"] }}</span>
+            <div class="chart-bar">
+              <span style="width: {{ row["percent"] }}%"></span>
+            </div>
+            <span class="chart-value">{{ row["count"] }}</span>
+          </div>
+        {% else %}
+          <p class="note">No tags found yet.</p>
+        {% endfor %}
+      </div>
+    </div>
+  </section>
+
+  <section class="section">
     <div class="card">
       <h3>Recent Activity</h3>
       <div class="list" id="activity-list">
