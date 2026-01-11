@@ -3,6 +3,8 @@ from __future__ import annotations
 import csv
 import io
 import json
+import re
+import unicodedata
 
 from fastapi import APIRouter, File, Form, HTTPException, Response, UploadFile
 
@@ -23,6 +25,50 @@ def _parse_tag_columns(raw: str) -> list[str]:
     return [part.strip() for part in stripped.split(",") if part.strip()]
 
 
+def _strip_bracketed(value: str) -> str:
+    previous = None
+    cleaned = value
+    patterns = [r"\([^)]*\)", r"\[[^\]]*\]", r"\{[^}]*\}", r"<[^>]*>"]
+    while previous != cleaned:
+        previous = cleaned
+        for pattern in patterns:
+            cleaned = re.sub(pattern, " ", cleaned)
+    return cleaned
+
+
+def _fold_to_ascii(value: str) -> str:
+    normalized = unicodedata.normalize("NFKD", value)
+    return normalized.encode("ascii", "ignore").decode("ascii")
+
+
+def _normalize_title(value: str | None) -> str | None:
+    if not value:
+        return None
+    text = _fold_to_ascii(value)
+    text = _strip_bracketed(text)
+    text = text.replace("&", " and ")
+    text = re.sub(r"\b(vol|volume|book|part|series)\.?\s*\d+\b", " ", text, flags=re.IGNORECASE)
+    text = re.sub(r"(#|no\.?|number)\s*\d+\b", " ", text, flags=re.IGNORECASE)
+    text = re.sub(r"[\"'`~!@#$%^*_=+|\\/;:,?.-]", " ", text)
+    text = re.sub(r"\s+", " ", text).strip().lower()
+    return text or None
+
+
+def _normalize_author(value: str | None) -> str | None:
+    if not value:
+        return None
+    text = _fold_to_ascii(value)
+    text = _strip_bracketed(text)
+    if "," in text:
+        last, rest = [part.strip() for part in text.split(",", 1)]
+        if rest:
+            text = f"{rest} {last}"
+    text = text.replace("&", " and ")
+    text = re.sub(r"[\"'`~!@#$%^*_=+|\\/;:,?.-]", " ", text)
+    text = re.sub(r"\s+", " ", text).strip().lower()
+    return text or None
+
+
 def build_bulk_actions_router(
     *,
     get_connection,
@@ -30,6 +76,8 @@ def build_bulk_actions_router(
     ActivityEvent,
     clean_unused_tags,
     clear_all_tags,
+    clear_database,
+    init_db,
     get_or_create_tag,
     add_tags_to_book,
     TAG_NAMESPACE_LIST,
@@ -177,6 +225,83 @@ def build_bulk_actions_router(
                 source="clear_tags",
             )
         return {"removed_links": removed_links, "removed_tags": removed_tags}
+
+    @router.post("/bulk-actions/clear-database")
+    def bulk_actions_clear_database() -> dict[str, str]:
+        with get_connection() as conn:
+            clear_database(conn)
+            init_db(conn)
+            log_activity(
+                conn,
+                ActivityEvent.CLEAR_DATABASE,
+                "database cleared",
+                source="clear_database",
+            )
+        return {"status": "cleared"}
+
+    @router.post("/bulk-actions/normalize-authors")
+    def bulk_actions_normalize_authors() -> dict[str, int]:
+        with get_connection() as conn:
+            rows = conn.execute(
+                """
+                SELECT id, name
+                FROM authors
+                ORDER BY id
+                """
+            ).fetchall()
+            updated = 0
+            for row in rows:
+                normalized = _normalize_author(row["name"])
+                conn.execute(
+                    """
+                    UPDATE authors
+                    SET normalized_author = ?
+                    WHERE id = ?
+                    """,
+                    (normalized, row["id"]),
+                )
+                updated += 1
+            conn.commit()
+            log_activity(
+                conn,
+                ActivityEvent.NORMALIZE_AUTHORS,
+                f"normalized {updated} authors",
+                metadata={"authors": updated},
+                source="normalize_authors",
+            )
+        return {"normalized": updated}
+
+    @router.post("/bulk-actions/normalize-titles")
+    def bulk_actions_normalize_titles() -> dict[str, int]:
+        with get_connection() as conn:
+            rows = conn.execute(
+                """
+                SELECT id, title
+                FROM books
+                ORDER BY id
+                """
+            ).fetchall()
+            updated = 0
+            for row in rows:
+                normalized = _normalize_title(row["title"])
+                conn.execute(
+                    """
+                    UPDATE books
+                    SET normalized_title = ?
+                    WHERE id = ?
+                    """,
+                    (normalized, row["id"]),
+                )
+                updated += 1
+            conn.commit()
+            log_activity(
+                conn,
+                ActivityEvent.NORMALIZE_TITLES,
+                f"normalized {updated} titles",
+                metadata={"books": updated},
+                source="normalize_titles",
+            )
+        return {"normalized": updated}
 
     @router.post("/bulk-actions/complete")
     def bulk_actions_complete(payload: BulkTaggingResult) -> dict[str, int | None | str]:

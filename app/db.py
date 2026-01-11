@@ -18,7 +18,10 @@ class ActivityEvent(str, Enum):
     BULK_TAGGING_STARTED = "bulk_tagging_started"
     BULK_TAGGING_COMPLETED = "bulk_tagging_completed"
     BULK_TAG_IMPORT = "bulk_tag_import"
+    NORMALIZE_TITLES = "normalize_titles"
+    NORMALIZE_AUTHORS = "normalize_authors"
     CLEAR_ALL_TAGS = "clear_all_tags"
+    CLEAR_DATABASE = "clear_database"
 
 
 def get_connection(db_path: Path | None = None) -> sqlite3.Connection:
@@ -52,7 +55,8 @@ def init_db(conn: sqlite3.Connection) -> None:
         CREATE TABLE IF NOT EXISTS authors (
             id INTEGER PRIMARY KEY,
             name TEXT UNIQUE NOT NULL,
-            created_at REAL NOT NULL
+            created_at REAL NOT NULL,
+            normalized_author TEXT
         );
         CREATE TABLE IF NOT EXISTS books (
             id INTEGER PRIMARY KEY,
@@ -225,6 +229,20 @@ def clear_all_tags(conn: sqlite3.Connection) -> tuple[int, int]:
     removed_tags = cur.rowcount
     conn.commit()
     return removed_links, removed_tags
+
+
+def clear_database(conn: sqlite3.Connection) -> None:
+    conn.executescript(
+        """
+        DROP TABLE IF EXISTS files;
+        DROP TABLE IF EXISTS book_tags;
+        DROP TABLE IF EXISTS tags;
+        DROP TABLE IF EXISTS books;
+        DROP TABLE IF EXISTS authors;
+        DROP TABLE IF EXISTS activity_log;
+        """
+    )
+    conn.commit()
 
 
 def get_book_tags(conn: sqlite3.Connection, book_id: int) -> list[sqlite3.Row]:

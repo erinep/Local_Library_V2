@@ -1,9 +1,7 @@
 {
   "library_roots": [
     "E:/Audio/audiobooks/_fiction",
-    "E:/Audio/audiobooks/_FantasySciFiHistory",
-    "E:/Audio/audiobooks/_romance",
-    "E:/Audio/audiobooks/_nonfiction"
+    "E:/Audio/audiobooks/_nonfiction",
   ],
   "allowed_extensions": [
     ".mp3",

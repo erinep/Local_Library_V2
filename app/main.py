@@ -14,6 +14,7 @@ from .db import (
     clean_unused_tags,
     ActivityEvent,
     clear_all_tags,
+    clear_database,
     get_book_tags,
     get_connection,
     get_or_create_author,
@@ -45,10 +46,11 @@ def _urlencode(value: object) -> str:
 templates.env.filters["urlencode"] = _urlencode
 
 TAG_NAMESPACE_CONFIG = [
-    {"tag_prefix": "Genre", "query_param": "genre", "ui_label": "Genre"},
-    {"tag_prefix": "Reader", "query_param": "reader", "ui_label": "Reader"},
-    {"tag_prefix": "Romance", "query_param": "romance", "ui_label": "Romance"},
-    {"tag_prefix": "Setting", "query_param": "setting", "ui_label": "Setting"},
+    {"tag_prefix": "Genre", "query_param": "genre", "ui_label": "Genre"},                 # Fantasy, Sci-Fi, Mystery, Thriller, 
+    {"tag_prefix": "Reader", "query_param": "reader", "ui_label": "Reader"},              # Commerical Fiction, Literay Ficiton, Young Adult, Middle Grade, Classics, Popular Non-Ficion, Academy/Scientific
+    {"tag_prefix": "Romance", "query_param": "romance", "ui_label": "Romance"},           # Main, Subplot, None
+    {"tag_prefix": "Setting", "query_param": "setting", "ui_label": "Setting"},           # Historical, Contemporary
+    {"tag_prefix": "Commitment", "query_param": "commitment", "ui_label": "Commitment"},  # Standalone, Series (Sequential), Series (Episodic)
 ]
 TAG_NAMESPACE_LIST = [entry["tag_prefix"] for entry in TAG_NAMESPACE_CONFIG]
 
@@ -186,6 +188,8 @@ app.include_router(
         ActivityEvent=ActivityEvent,
         clean_unused_tags=clean_unused_tags,
         clear_all_tags=clear_all_tags,
+        clear_database=clear_database,
+        init_db=init_db,
         get_or_create_tag=get_or_create_tag,
         add_tags_to_book=add_tags_to_book,
         TAG_NAMESPACE_LIST=TAG_NAMESPACE_LIST,

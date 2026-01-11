@@ -39,10 +39,28 @@
       <p class="note" id="clean-tags-status">Idle</p>
     </div>
     <div class="card">
+      <h3>Normalize authors</h3>
+      <p class="note">Generate normalized author names for matching.</p>
+      <button class="btn btn-outline" type="button" data-normalize-authors>Normalize authors</button>
+      <p class="note" id="normalize-authors-status">Idle</p>
+    </div>
+    <div class="card">
+      <h3>Normalize titles</h3>
+      <p class="note">Generate normalized titles for matching.</p>
+      <button class="btn btn-outline" type="button" data-normalize-titles>Normalize titles</button>
+      <p class="note" id="normalize-titles-status">Idle</p>
+    </div>
+    <div class="card">
       <h3>Clear all tags</h3>
       <p class="note">Remove every tag and clear all book-tag links.</p>
       <button class="btn btn-outline" type="button" data-clear-tags>Clear all tags</button>
       <p class="note" id="clear-tags-status">Idle</p>
+    </div>
+    <div class="card">
+      <h3>Clear database</h3>
+      <p class="note">Remove all tables and recreate an empty database.</p>
+      <button class="btn btn-outline" type="button" data-clear-database>Clear database</button>
+      <p class="note" id="clear-database-status">Idle</p>
     </div>
   </section>
 
@@ -158,8 +176,14 @@
     const bulkAddButton = bulkModal ? bulkModal.querySelector("[data-bulk-add]") : null;
     const cleanTagsButton = document.querySelector("[data-clean-tags]");
     const cleanTagsStatus = document.getElementById("clean-tags-status");
+    const normalizeAuthorsButton = document.querySelector("[data-normalize-authors]");
+    const normalizeAuthorsStatus = document.getElementById("normalize-authors-status");
+    const normalizeTitlesButton = document.querySelector("[data-normalize-titles]");
+    const normalizeTitlesStatus = document.getElementById("normalize-titles-status");
     const clearTagsButton = document.querySelector("[data-clear-tags]");
     const clearTagsStatus = document.getElementById("clear-tags-status");
+    const clearDatabaseButton = document.querySelector("[data-clear-database]");
+    const clearDatabaseStatus = document.getElementById("clear-database-status");
     const csvImportButton = document.querySelector("[data-csv-import]");
     const csvModal = document.querySelector("[data-csv-import-modal]");
     const csvCloseButtons = csvModal ? csvModal.querySelectorAll("[data-csv-close]") : [];
@@ -682,6 +706,44 @@
       });
     }
 
+    if (normalizeAuthorsButton && normalizeAuthorsStatus) {
+      normalizeAuthorsButton.addEventListener("click", async () => {
+        normalizeAuthorsButton.disabled = true;
+        normalizeAuthorsStatus.textContent = "Normalizing...";
+        try {
+          const response = await fetch("/bulk-actions/normalize-authors", { method: "POST" });
+          if (!response.ok) {
+            throw new Error("Normalize failed.");
+          }
+          const result = await response.json();
+          normalizeAuthorsStatus.textContent = `Normalized ${result.normalized} authors.`;
+        } catch (error) {
+          normalizeAuthorsStatus.textContent = "Normalize failed. Check server logs.";
+        } finally {
+          normalizeAuthorsButton.disabled = false;
+        }
+      });
+    }
+
+    if (normalizeTitlesButton && normalizeTitlesStatus) {
+      normalizeTitlesButton.addEventListener("click", async () => {
+        normalizeTitlesButton.disabled = true;
+        normalizeTitlesStatus.textContent = "Normalizing...";
+        try {
+          const response = await fetch("/bulk-actions/normalize-titles", { method: "POST" });
+          if (!response.ok) {
+            throw new Error("Normalize failed.");
+          }
+          const result = await response.json();
+          normalizeTitlesStatus.textContent = `Normalized ${result.normalized} titles.`;
+        } catch (error) {
+          normalizeTitlesStatus.textContent = "Normalize failed. Check server logs.";
+        } finally {
+          normalizeTitlesButton.disabled = false;
+        }
+      });
+    }
+
     if (clearTagsButton && clearTagsStatus) {
       clearTagsButton.addEventListener("click", async () => {
         const confirmed = window.confirm("Delete all tags and book-tag links?");
@@ -700,6 +762,28 @@
           clearTagsStatus.textContent = "Clear failed. Check server logs.";
         } finally {
           clearTagsButton.disabled = false;
+        }
+      });
+    }
+
+    if (clearDatabaseButton && clearDatabaseStatus) {
+      clearDatabaseButton.addEventListener("click", async () => {
+        const confirmed = window.confirm(
+          "Clear the entire database? This removes all books, tags, and activity logs."
+        );
+        if (!confirmed) return;
+        clearDatabaseButton.disabled = true;
+        clearDatabaseStatus.textContent = "Clearing...";
+        try {
+          const response = await fetch("/bulk-actions/clear-database", { method: "POST" });
+          if (!response.ok) {
+            throw new Error("Clear failed.");
+          }
+          clearDatabaseStatus.textContent = "Database cleared.";
+        } catch (error) {
+          clearDatabaseStatus.textContent = "Clear failed. Check server logs.";
+        } finally {
+          clearDatabaseButton.disabled = false;
         }
       });
     }
