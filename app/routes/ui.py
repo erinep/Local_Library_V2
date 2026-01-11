@@ -7,6 +7,18 @@ from fastapi import APIRouter, Form, Request, Response
 from fastapi.responses import FileResponse
 from fastapi.responses import RedirectResponse
 
+from ..db import (
+    fetch_author_name,
+    fetch_authors,
+    fetch_book_detail,
+    fetch_book_files,
+    fetch_books,
+    fetch_recommendation_books,
+    fetch_tag_name,
+    fetch_tag_rows_for_recommendations,
+    fetch_tags_with_counts,
+)
+
 
 def build_ui_router(
     *,
@@ -83,14 +95,7 @@ def build_ui_router(
         }
         topic_ids = _unique_ids(_parse_int_list(query_params.getlist("topic_id")))
         with get_connection() as conn:
-            tag_rows = conn.execute(
-                """
-                SELECT id, name
-                FROM tags
-                WHERE name LIKE '%:%'
-                ORDER BY name
-                """
-            ).fetchall()
+            tag_rows = fetch_tag_rows_for_recommendations(conn)
             grouped: dict[str, list[dict[str, object]]] = {ns: [] for ns in TAG_NAMESPACE_LIST}
             topics: list[dict[str, object]] = []
             for row in tag_rows:
@@ -109,47 +114,7 @@ def build_ui_router(
                 "Topic": topic_ids,
             }
 
-            selected_tag_ids = [tag_id for ids in namespace_filters.values() for tag_id in ids]
-            selected_tag_ids.extend(topic_ids)
-
-            if selected_tag_ids:
-                placeholders = ", ".join("?" for _ in selected_tag_ids)
-                having_clauses: list[str] = []
-                params: list[object] = [*selected_tag_ids]
-                for ids in namespace_filters.values():
-                    if not ids:
-                        continue
-                    namespace_placeholders = ", ".join("?" for _ in ids)
-                    having_clauses.append(
-                        f"SUM(CASE WHEN bt.tag_id IN ({namespace_placeholders}) THEN 1 ELSE 0 END) > 0"
-                    )
-                    params.extend(ids)
-                if topic_ids:
-                    topic_placeholders = ", ".join("?" for _ in topic_ids)
-                    having_clauses.append(
-                        f"SUM(CASE WHEN bt.tag_id IN ({topic_placeholders}) THEN 1 ELSE 0 END) > 0"
-                    )
-                    params.extend(topic_ids)
-
-                rows = conn.execute(
-                    f"""
-                    SELECT
-                        b.id,
-                        b.title,
-                        a.name AS author,
-                        (SELECT COUNT(*) FROM files f WHERE f.book_id = b.id) AS file_count
-                    FROM books b
-                    LEFT JOIN authors a ON a.id = b.author_id
-                    INNER JOIN book_tags bt ON bt.book_id = b.id
-                    WHERE bt.tag_id IN ({placeholders})
-                    GROUP BY b.id
-                    HAVING {' AND '.join(having_clauses)}
-                    ORDER BY a.name, b.title
-                    """,
-                    params,
-                ).fetchall()
-            else:
-                rows = []
+            rows = fetch_recommendation_books(conn, namespace_filters, topic_ids)
 
             label_map = {item["id"]: item["display_name"] for group in grouped.values() for item in group}
             topic_labels = {item["id"]: item["display_name"] for item in topics}
@@ -200,52 +165,16 @@ def build_ui_router(
                 rows = []
             else:
                 if author_id is not None:
-                    author_row = conn.execute(
-                        "SELECT name FROM authors WHERE id = ?",
-                        (author_id,),
-                    ).fetchone()
-                    author_name = author_row["name"] if author_row else None
+                    author_name = fetch_author_name(conn, author_id)
                 if tag_id is not None:
-                    tag_row = conn.execute(
-                        "SELECT name FROM tags WHERE id = ?",
-                        (tag_id,),
-                    ).fetchone()
-                    tag_name = tag_row["name"] if tag_row else None
+                    tag_name = fetch_tag_name(conn, tag_id)
 
-                joins = []
-                where_clauses = []
-                params: list[object] = []
-                if tag_id is not None:
-                    joins.append("INNER JOIN book_tags bt ON bt.book_id = b.id")
-                    where_clauses.append("bt.tag_id = ?")
-                    params.append(tag_id)
-                if author_id is not None:
-                    where_clauses.append("b.author_id = ?")
-                    params.append(author_id)
-                if search_term:
-                    where_clauses.append("(b.title LIKE ? OR a.name LIKE ?)")
-                    like_term = f"%{search_term}%"
-                    params.extend([like_term, like_term])
-
-                join_sql = "\n                ".join(joins)
-                where_sql = f"WHERE {' AND '.join(where_clauses)}" if where_clauses else ""
-                order_by = "ORDER BY b.title" if author_id is not None else "ORDER BY a.name, b.title"
-
-                rows = conn.execute(
-                    f"""
-                    SELECT
-                        b.id,
-                        b.title,
-                        a.name AS author,
-                        (SELECT COUNT(*) FROM files f WHERE f.book_id = b.id) AS file_count
-                    FROM books b
-                    LEFT JOIN authors a ON a.id = b.author_id
-                    {join_sql}
-                    {where_sql}
-                    {order_by}
-                    """,
-                    params,
-                ).fetchall()
+                rows = fetch_books(
+                    conn,
+                    author_id=author_id,
+                    tag_id=tag_id,
+                    search_term=search_term,
+                )
         return templates.TemplateResponse(
             "books.html",
             {
@@ -262,16 +191,7 @@ def build_ui_router(
     @router.get("/authors")
     def ui_authors(request: Request):
         with get_connection() as conn:
-            rows = conn.execute(
-                """
-                SELECT
-                    a.id,
-                    a.name,
-                    (SELECT COUNT(*) FROM books b WHERE b.author_id = a.id) AS book_count
-                FROM authors a
-                ORDER BY a.name
-                """
-            ).fetchall()
+            rows = fetch_authors(conn)
         return templates.TemplateResponse(
             "authors.html",
             {"request": request, "authors": rows},
@@ -280,17 +200,7 @@ def build_ui_router(
     @router.get("/tags")
     def ui_tags(request: Request):
         with get_connection() as conn:
-            rows = conn.execute(
-                """
-                SELECT
-                    t.id,
-                    t.name,
-                    (SELECT COUNT(*) FROM book_tags bt WHERE bt.tag_id = t.id) AS book_count
-                FROM tags t
-                WHERE t.name NOT LIKE 'topic:%'
-                ORDER BY t.name
-                """
-            ).fetchall()
+            rows = fetch_tags_with_counts(conn, include_topics=False)
         return templates.TemplateResponse(
             "tags.html",
             {"request": request, "tags": rows},
@@ -299,17 +209,7 @@ def build_ui_router(
     @router.get("/topics")
     def ui_topics(request: Request):
         with get_connection() as conn:
-            rows = conn.execute(
-                """
-                SELECT
-                    t.id,
-                    t.name,
-                    (SELECT COUNT(*) FROM book_tags bt WHERE bt.tag_id = t.id) AS book_count
-                FROM tags t
-                WHERE t.name LIKE 'topic:%'
-                ORDER BY t.name
-                """
-            ).fetchall()
+            rows = fetch_tags_with_counts(conn, include_topics=True)
         topics = [
             {
                 "id": row["id"],
@@ -342,30 +242,9 @@ def build_ui_router(
     @router.get("/books/{book_id}")
     def ui_book_detail(request: Request, book_id: int):
         with get_connection() as conn:
-            book = conn.execute(
-                """
-                SELECT
-                    b.id,
-                    b.title,
-                    b.path,
-                    a.name AS author,
-                    b.author_id AS author_id
-                FROM books b
-                LEFT JOIN authors a ON a.id = b.author_id
-                WHERE b.id = ?
-                """,
-                (book_id,),
-            ).fetchone()
+            book = fetch_book_detail(conn, book_id)
             tags = get_book_tags(conn, book_id)
-            files = conn.execute(
-                """
-                SELECT path, size_bytes, modified_time
-                FROM files
-                WHERE book_id = ?
-                ORDER BY path
-                """,
-                (book_id,),
-            ).fetchall()
+            files = fetch_book_files(conn, book_id)
         if book is None:
             return Response(status_code=404)
         return templates.TemplateResponse(

@@ -20,6 +20,8 @@ from .db import (
     get_or_create_author,
     get_or_create_book,
     get_or_create_tag,
+    fetch_dashboard_totals,
+    fetch_recent_activity,
     init_db,
     log_activity,
     remove_tag_from_book,
@@ -73,22 +75,8 @@ def _format_bytes(size_bytes: int) -> str:
 
 def _get_dashboard_data():
     with get_connection() as conn:
-        totals = conn.execute(
-            """
-            SELECT
-                (SELECT COUNT(*) FROM authors) AS authors,
-                (SELECT COUNT(*) FROM books) AS books,
-                (SELECT COUNT(*) FROM files) AS files
-            """
-        ).fetchone()
-        activity = conn.execute(
-            """
-            SELECT event_type, result, created_at
-            FROM activity_log
-            ORDER BY created_at DESC
-            LIMIT 8
-            """
-        ).fetchall()
+        totals = fetch_dashboard_totals(conn)
+        activity = fetch_recent_activity(conn, limit=8)
     formatted_activity = [
         {
             "event_type": entry["event_type"],

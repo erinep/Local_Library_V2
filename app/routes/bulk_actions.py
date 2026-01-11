@@ -8,6 +8,15 @@ import unicodedata
 
 from fastapi import APIRouter, File, Form, HTTPException, Response, UploadFile
 
+from ..db import (
+    book_exists,
+    fetch_authors_for_normalization,
+    fetch_books_for_normalization,
+    fetch_bulk_actions_books,
+    fetch_bulk_export_rows,
+    update_normalized_author,
+    update_normalized_title,
+)
 from ..schemas import BookTagSummary, BulkTagImportResult, BulkTaggingResult
 
 
@@ -87,20 +96,7 @@ def build_bulk_actions_router(
     @router.get("/bulk-actions/books", response_model=list[BookTagSummary])
     def bulk_actions_books() -> list[BookTagSummary]:
         with get_connection() as conn:
-            rows = conn.execute(
-                """
-                SELECT
-                    b.id AS book_id,
-                    b.title AS title,
-                    a.name AS author,
-                    t.name AS tag_name
-                FROM books b
-                LEFT JOIN authors a ON a.id = b.author_id
-                LEFT JOIN book_tags bt ON bt.book_id = b.id
-                LEFT JOIN tags t ON t.id = bt.tag_id
-                ORDER BY a.name, b.title, t.name
-                """
-            ).fetchall()
+            rows = fetch_bulk_actions_books(conn)
         books: dict[int, BookTagSummary] = {}
         for row in rows:
             book_id = int(row["book_id"])
@@ -130,20 +126,7 @@ def build_bulk_actions_router(
     @router.get("/bulk-actions/export")
     def bulk_actions_export() -> Response:
         with get_connection() as conn:
-            rows = conn.execute(
-                """
-                SELECT
-                    b.id,
-                    b.title,
-                    a.name AS author,
-                    t.name AS tag_name
-                FROM books b
-                LEFT JOIN authors a ON a.id = b.author_id
-                LEFT JOIN book_tags bt ON bt.book_id = b.id
-                LEFT JOIN tags t ON t.id = bt.tag_id
-                ORDER BY a.name, b.title, t.name
-                """
-            ).fetchall()
+            rows = fetch_bulk_export_rows(conn)
         books: dict[int, dict[str, object]] = {}
         prefixes: set[str] = set()
         for row in rows:
@@ -242,24 +225,11 @@ def build_bulk_actions_router(
     @router.post("/bulk-actions/normalize-authors")
     def bulk_actions_normalize_authors() -> dict[str, int]:
         with get_connection() as conn:
-            rows = conn.execute(
-                """
-                SELECT id, name
-                FROM authors
-                ORDER BY id
-                """
-            ).fetchall()
+            rows = fetch_authors_for_normalization(conn)
             updated = 0
             for row in rows:
                 normalized = _normalize_author(row["name"])
-                conn.execute(
-                    """
-                    UPDATE authors
-                    SET normalized_author = ?
-                    WHERE id = ?
-                    """,
-                    (normalized, row["id"]),
-                )
+                update_normalized_author(conn, int(row["id"]), normalized)
                 updated += 1
             conn.commit()
             log_activity(
@@ -274,24 +244,11 @@ def build_bulk_actions_router(
     @router.post("/bulk-actions/normalize-titles")
     def bulk_actions_normalize_titles() -> dict[str, int]:
         with get_connection() as conn:
-            rows = conn.execute(
-                """
-                SELECT id, title
-                FROM books
-                ORDER BY id
-                """
-            ).fetchall()
+            rows = fetch_books_for_normalization(conn)
             updated = 0
             for row in rows:
                 normalized = _normalize_title(row["title"])
-                conn.execute(
-                    """
-                    UPDATE books
-                    SET normalized_title = ?
-                    WHERE id = ?
-                    """,
-                    (normalized, row["id"]),
-                )
+                update_normalized_title(conn, int(row["id"]), normalized)
                 updated += 1
             conn.commit()
             log_activity(
@@ -396,8 +353,7 @@ def build_bulk_actions_router(
                     invalid_rows += 1
                     continue
 
-                exists = conn.execute("SELECT 1 FROM books WHERE id = ?", (book_id,)).fetchone()
-                if not exists:
+                if not book_exists(conn, book_id):
                     missing_book_ids.add(book_id)
                     continue
 
