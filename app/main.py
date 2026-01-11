@@ -5,7 +5,12 @@ from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
-from .config import iter_files, load_config
+from .config import (
+    get_tag_namespace_config,
+    get_tag_namespace_list,
+    iter_files,
+    load_config,
+)
 from .db import (
     add_tags_to_book,
     clean_unused_tags,
@@ -43,14 +48,8 @@ def _urlencode(value: object) -> str:
 
 templates.env.filters["urlencode"] = urlencode_value
 
-TAG_NAMESPACE_CONFIG = [
-    {"tag_prefix": "Genre", "query_param": "genre", "ui_label": "Genre"},                 # Fantasy, Sci-Fi, Mystery, Thriller, 
-    {"tag_prefix": "Reader", "query_param": "reader", "ui_label": "Reader"},              # Commerical Fiction, Literay Ficiton, Young Adult, Middle Grade, Classics, Popular Non-Ficion, Academy/Scientific
-    {"tag_prefix": "Romance", "query_param": "romance", "ui_label": "Romance"},           # Main, Subplot, None
-    {"tag_prefix": "Setting", "query_param": "setting", "ui_label": "Setting"},           # Historical, Contemporary
-    {"tag_prefix": "Commitment", "query_param": "commitment", "ui_label": "Commitment"},  # Standalone, Series (Sequential), Series (Episodic)
-]
-TAG_NAMESPACE_LIST = [entry["tag_prefix"] for entry in TAG_NAMESPACE_CONFIG]
+TAG_NAMESPACE_CONFIG = get_tag_namespace_config()
+TAG_NAMESPACE_LIST = get_tag_namespace_list(TAG_NAMESPACE_CONFIG)
 
 
 @app.on_event("startup")

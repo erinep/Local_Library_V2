@@ -13,5 +13,27 @@
     "node_modules",
     "__pycache__"
   ],
-  "db_name": "testing-1.db"
+  "db_name": "testing-1.db",
+  "tag_namespace_config": [
+    {
+      "tag_prefix": "Genre",
+      "ui_label": "Genre"
+    },
+    {
+      "tag_prefix": "Reader",
+      "ui_label": "Reader"
+    },
+    {
+      "tag_prefix": "Romance",
+      "ui_label": "Romance"
+    },
+    {
+      "tag_prefix": "Setting",
+      "ui_label": "Setting"
+    },
+    {
+      "tag_prefix": "Commitment",
+      "ui_label": "Commitment"
+    }
+  ]
 }

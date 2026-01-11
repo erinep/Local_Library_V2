@@ -96,12 +96,10 @@ def build_ui_router(
             return parsed
 
         query_params = request.query_params
-        namespace_inputs = {
-            entry["query_param"]: _parse_int_list(query_params.getlist(entry["query_param"]))
-            for entry in TAG_NAMESPACE_CONFIG
-        }
         namespace_filters = {
-            entry["tag_prefix"]: _unique_ids(namespace_inputs[entry["query_param"]])
+            entry["tag_prefix"]: _unique_ids(
+                _parse_int_list(query_params.getlist(entry["tag_prefix"]))
+            )
             for entry in TAG_NAMESPACE_CONFIG
         }
         topic_ids = _unique_ids(_parse_int_list(query_params.getlist("topic_id")))

@@ -113,6 +113,12 @@ System behavior is controlled through a `config.json` file.
   "library_roots": ["<path to library scan>"],
   "allowed_extensions": ["<file types to include on scan>"],
   "ignore_patterns": ["<files or folders to ignore>"],
+  "tag_namespace_config": [ 
+    {
+      "tag_prefix": "<tag_prefix used in the db and query strings>",
+      "ui_label": "<name rendered in the UI>"
+    }
+  ],
   "db_name": "<optional; defaults to library.db>"
 }
 ```
