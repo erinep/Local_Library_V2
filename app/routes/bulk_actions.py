@@ -1,87 +1,29 @@
 from __future__ import annotations
 
+"""Bulk-action routes for tag management, normalization, and CSV workflows."""
+
 import csv
 import io
-import json
-import re
-import unicodedata
 
 from fastapi import APIRouter, File, Form, HTTPException, Response, UploadFile
 
-from ..db import (
+from ..services.db_queries import (
     book_exists,
     fetch_authors_for_normalization,
     fetch_books_for_normalization,
-    fetch_bulk_actions_books,
+    fetch_books_with_authors_and_tags,
     fetch_bulk_export_rows,
+    log_activity,
     update_normalized_author,
     update_normalized_title,
 )
+from ..services.ingest import parse_tag_columns
+from ..services.normalization import normalize_author, normalize_title
 from ..schemas import BookTagSummary, BulkTagImportResult, BulkTaggingResult
-
-
-def _parse_tag_columns(raw: str) -> list[str]:
-    stripped = raw.strip()
-    if not stripped:
-        return []
-    if stripped.startswith("["):
-        try:
-            parsed = json.loads(stripped)
-        except json.JSONDecodeError:
-            parsed = []
-        if isinstance(parsed, list):
-            return [str(item).strip() for item in parsed if str(item).strip()]
-    return [part.strip() for part in stripped.split(",") if part.strip()]
-
-
-def _strip_bracketed(value: str) -> str:
-    previous = None
-    cleaned = value
-    patterns = [r"\([^)]*\)", r"\[[^\]]*\]", r"\{[^}]*\}", r"<[^>]*>"]
-    while previous != cleaned:
-        previous = cleaned
-        for pattern in patterns:
-            cleaned = re.sub(pattern, " ", cleaned)
-    return cleaned
-
-
-def _fold_to_ascii(value: str) -> str:
-    normalized = unicodedata.normalize("NFKD", value)
-    return normalized.encode("ascii", "ignore").decode("ascii")
-
-
-def _normalize_title(value: str | None) -> str | None:
-    if not value:
-        return None
-    text = _fold_to_ascii(value)
-    text = _strip_bracketed(text)
-    text = text.replace("&", " and ")
-    text = re.sub(r"\b(vol|volume|book|part|series)\.?\s*\d+\b", " ", text, flags=re.IGNORECASE)
-    text = re.sub(r"(#|no\.?|number)\s*\d+\b", " ", text, flags=re.IGNORECASE)
-    text = re.sub(r"[\"'`~!@#$%^*_=+|\\/;:,?.-]", " ", text)
-    text = re.sub(r"\s+", " ", text).strip().lower()
-    return text or None
-
-
-def _normalize_author(value: str | None) -> str | None:
-    if not value:
-        return None
-    text = _fold_to_ascii(value)
-    text = _strip_bracketed(text)
-    if "," in text:
-        last, rest = [part.strip() for part in text.split(",", 1)]
-        if rest:
-            text = f"{rest} {last}"
-    text = text.replace("&", " and ")
-    text = re.sub(r"[\"'`~!@#$%^*_=+|\\/;:,?.-]", " ", text)
-    text = re.sub(r"\s+", " ", text).strip().lower()
-    return text or None
-
 
 def build_bulk_actions_router(
     *,
     get_connection,
-    log_activity,
     ActivityEvent,
     clean_unused_tags,
     clear_all_tags,
@@ -91,12 +33,14 @@ def build_bulk_actions_router(
     add_tags_to_book,
     TAG_NAMESPACE_LIST,
 ) -> APIRouter:
+    """Create the bulk-actions router and wire handlers to injected services."""
     router = APIRouter()
 
     @router.get("/bulk-actions/books", response_model=list[BookTagSummary])
     def bulk_actions_books() -> list[BookTagSummary]:
+        """Return book summaries (with tags) for the bulk-tagging UI."""
         with get_connection() as conn:
-            rows = fetch_bulk_actions_books(conn)
+            rows = fetch_books_with_authors_and_tags(conn)
         books: dict[int, BookTagSummary] = {}
         for row in rows:
             book_id = int(row["book_id"])
@@ -125,6 +69,7 @@ def build_bulk_actions_router(
 
     @router.get("/bulk-actions/export")
     def bulk_actions_export() -> Response:
+        """Export library data with tags as a CSV download."""
         with get_connection() as conn:
             rows = fetch_bulk_export_rows(conn)
         books: dict[int, dict[str, object]] = {}
@@ -185,6 +130,7 @@ def build_bulk_actions_router(
 
     @router.post("/bulk-actions/cleanup-tags")
     def bulk_actions_cleanup_tags() -> dict[str, int]:
+        """Remove orphaned tags with no book associations."""
         with get_connection() as conn:
             removed = clean_unused_tags(conn)
             log_activity(
@@ -198,6 +144,7 @@ def build_bulk_actions_router(
 
     @router.post("/bulk-actions/clear-tags")
     def bulk_actions_clear_tags() -> dict[str, int]:
+        """Delete all tags and book-tag relationships."""
         with get_connection() as conn:
             removed_links, removed_tags = clear_all_tags(conn)
             log_activity(
@@ -211,6 +158,7 @@ def build_bulk_actions_router(
 
     @router.post("/bulk-actions/clear-database")
     def bulk_actions_clear_database() -> dict[str, str]:
+        """Drop and recreate the database schema."""
         with get_connection() as conn:
             clear_database(conn)
             init_db(conn)
@@ -224,11 +172,12 @@ def build_bulk_actions_router(
 
     @router.post("/bulk-actions/normalize-authors")
     def bulk_actions_normalize_authors() -> dict[str, int]:
+        """Normalize author names and store results in the authors table."""
         with get_connection() as conn:
             rows = fetch_authors_for_normalization(conn)
             updated = 0
             for row in rows:
-                normalized = _normalize_author(row["name"])
+                normalized = normalize_author(row["name"])
                 update_normalized_author(conn, int(row["id"]), normalized)
                 updated += 1
             conn.commit()
@@ -243,11 +192,12 @@ def build_bulk_actions_router(
 
     @router.post("/bulk-actions/normalize-titles")
     def bulk_actions_normalize_titles() -> dict[str, int]:
+        """Normalize book titles and store results in the books table."""
         with get_connection() as conn:
             rows = fetch_books_for_normalization(conn)
             updated = 0
             for row in rows:
-                normalized = _normalize_title(row["title"])
+                normalized = normalize_title(row["title"])
                 update_normalized_title(conn, int(row["id"]), normalized)
                 updated += 1
             conn.commit()
@@ -262,6 +212,7 @@ def build_bulk_actions_router(
 
     @router.post("/bulk-actions/complete")
     def bulk_actions_complete(payload: BulkTaggingResult) -> dict[str, int | None | str]:
+        """Record completion or stop status for the bulk-tagging session."""
         normalized = payload.status.lower()
         if normalized not in {"completed", "stopped"}:
             normalized = "completed"
@@ -286,6 +237,7 @@ def build_bulk_actions_router(
         book_id_column: str = Form(...),
         tag_columns: str = Form(...),
     ) -> BulkTagImportResult:
+        """Import tags from CSV using column-to-namespace mapping."""
         content = await file.read()
         if not content:
             raise HTTPException(status_code=400, detail="CSV file is empty.")
@@ -307,7 +259,7 @@ def build_bulk_actions_router(
         book_id_index = header_lookup[book_key]
 
         selected_columns = [
-            column for column in _parse_tag_columns(tag_columns)
+            column for column in parse_tag_columns(tag_columns)
             if column.strip().lower() != book_key
         ]
         if not selected_columns:

@@ -96,7 +96,42 @@ nav a:hover {
 }
 
 .bulk-actions-grid {
-  grid-template-columns: 1fr;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+}
+
+.bulk-actions-section h4 {
+  margin: 0 0 6px;
+  font-size: 16px;
+}
+
+.bulk-actions-section .list-item {
+  align-items: center;
+}
+
+.bulk-actions-info .note {
+  margin: 0;
+}
+
+.bulk-actions-action {
+  display: grid;
+  gap: 6px;
+  justify-items: end;
+  min-width: 160px;
+}
+
+.bulk-actions-action .note {
+  margin: 0;
+  text-align: right;
+}
+
+.bulk-actions-danger .list-item {
+  border-color: rgba(209, 123, 15, 0.35);
+  background: #fff5e6;
+}
+
+.bulk-actions-danger .btn-outline {
+  color: var(--accent-2);
+  border-color: var(--accent-2);
 }
 
 .list {
@@ -123,6 +158,15 @@ nav a:hover {
   color: var(--ink);
   text-decoration: none;
   font-weight: 600;
+}
+
+.list-item a.btn {
+  color: #fffaf0;
+  font-weight: 700;
+}
+
+.list-item a.btn.btn-outline {
+  color: var(--accent);
 }
 
 .badge {
@@ -214,11 +258,6 @@ nav a:hover {
   border: none;
   background: transparent;
   border-radius: 0;
-}
-
-.tag-list-plain .tag-pill a {
-  color: var(--ink);
-  font-weight: 600;
 }
 
 .tag-list-config {
@@ -329,17 +368,6 @@ nav a:hover {
 .recommendations-form .rec-namespace {
   flex-direction: row;
   align-items: flex-start;
-}
-
-.recommendations-form .rec-field {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.recommendations-form .rec-field .note {
-  min-width: 120px;
-  margin: 0;
 }
 
 .recommendations-form .rec-group {
@@ -547,5 +575,19 @@ nav a:hover {
   nav a {
     margin-left: 0;
     margin-right: 12px;
+  }
+
+  .bulk-actions-section .list-item {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .bulk-actions-action {
+    justify-items: start;
+    width: 100%;
+  }
+
+  .bulk-actions-action .note {
+    text-align: left;
   }
 }

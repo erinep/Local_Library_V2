@@ -1,8 +1,5 @@
 from __future__ import annotations
 
-from datetime import datetime
-from pathlib import Path
-from urllib.parse import quote_plus
 
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
@@ -15,15 +12,11 @@ from .db import (
     ActivityEvent,
     clear_all_tags,
     clear_database,
-    get_book_tags,
     get_connection,
     get_or_create_author,
     get_or_create_book,
     get_or_create_tag,
-    fetch_dashboard_totals,
-    fetch_recent_activity,
     init_db,
-    log_activity,
     remove_tag_from_book,
     upsert_files,
 )
@@ -31,6 +24,9 @@ from .metadataProvider import GoogleBooksProvider
 from .routes.api import build_api_router
 from .routes.bulk_actions import build_bulk_actions_router
 from .routes.ui import build_ui_router
+from .services.db_queries import log_activity
+from .services.ingest import infer_book_id
+from .services.ui_helpers import get_dashboard_data, urlencode_value
 
 app = FastAPI(title="Audiobook Library Backend")
 _books_provider = GoogleBooksProvider()
@@ -45,7 +41,7 @@ def _urlencode(value: object) -> str:
     return quote_plus(str(value))
 
 
-templates.env.filters["urlencode"] = _urlencode
+templates.env.filters["urlencode"] = urlencode_value
 
 TAG_NAMESPACE_CONFIG = [
     {"tag_prefix": "Genre", "query_param": "genre", "ui_label": "Genre"},                 # Fantasy, Sci-Fi, Mystery, Thriller, 
@@ -63,82 +59,6 @@ def startup() -> None:
         init_db(conn)
 
 
-def _format_bytes(size_bytes: int) -> str:
-    units = ["B", "KB", "MB", "GB", "TB"]
-    size = float(size_bytes)
-    for unit in units:
-        if size < 1024 or unit == units[-1]:
-            return f"{size:.1f} {unit}"
-        size /= 1024
-    return f"{size:.1f} {units[-1]}"
-
-
-def _get_dashboard_data():
-    with get_connection() as conn:
-        totals = fetch_dashboard_totals(conn)
-        activity = fetch_recent_activity(conn, limit=8)
-    formatted_activity = [
-        {
-            "event_type": entry["event_type"],
-            "result": entry["result"],
-            "created_at": datetime.fromtimestamp(entry["created_at"]).isoformat(),
-        }
-        for entry in activity
-    ]
-    return totals, formatted_activity
-
-
-def _split_tags(raw: str) -> list[str]:
-    parts = [part.strip() for part in raw.replace("\n", ",").split(",")]
-    seen: set[str] = set()
-    cleaned: list[str] = []
-    for part in parts:
-        normalized = " ".join(part.split())
-        if not normalized:
-            continue
-        key = normalized.lower()
-        if key in seen:
-            continue
-        seen.add(key)
-        cleaned.append(normalized)
-    return cleaned
-
-
-def _normalize_search(raw: str | None) -> str | None:
-    if not raw:
-        return None
-    cleaned = " ".join(raw.split())
-    return cleaned or None
-
-
-def _infer_book_id(
-    conn,
-    file_path: Path,
-    roots: list[Path],
-    author_cache: dict[str, int],
-    book_cache: dict[str, int],
-) -> int | None:
-    root = next((r for r in roots if file_path.is_relative_to(r)), None)
-    if root is None:
-        return None
-    parts = file_path.relative_to(root).parts
-    if len(parts) < 3:
-        return None
-    author = parts[0]
-    title = parts[1]
-    book_folder = root / author / title
-    book_key = str(book_folder)
-    author_id = author_cache.get(author)
-    if author_id is None:
-        author_id = get_or_create_author(conn, author)
-        author_cache[author] = author_id
-    book_id = book_cache.get(book_key)
-    if book_id is None:
-        book_id = get_or_create_book(conn, title, author_id, book_key)
-        book_cache[book_key] = book_id
-    return book_id
-
-
 app.include_router(
     build_api_router(
         books_provider=_books_provider,
@@ -148,23 +68,23 @@ app.include_router(
         upsert_files=upsert_files,
         log_activity=log_activity,
         ActivityEvent=ActivityEvent,
-        infer_book_id=_infer_book_id,
+        infer_book_id=lambda *args, **kwargs: infer_book_id(
+            *args,
+            **kwargs,
+            get_or_create_author=get_or_create_author,
+            get_or_create_book=get_or_create_book,
+        ),
     )
 )
 app.include_router(
     build_ui_router(
         templates=templates,
         get_connection=get_connection,
-        get_dashboard_data=_get_dashboard_data,
-        get_book_tags=get_book_tags,
+        get_dashboard_data=lambda: get_dashboard_data(get_connection),
         add_tags_to_book=add_tags_to_book,
         remove_tag_from_book=remove_tag_from_book,
         get_or_create_tag=get_or_create_tag,
-        log_activity=log_activity,
         ActivityEvent=ActivityEvent,
-        split_tags=_split_tags,
-        normalize_search=_normalize_search,
-        format_bytes=_format_bytes,
         TAG_NAMESPACE_CONFIG=TAG_NAMESPACE_CONFIG,
         TAG_NAMESPACE_LIST=TAG_NAMESPACE_LIST,
     )
@@ -172,7 +92,6 @@ app.include_router(
 app.include_router(
     build_bulk_actions_router(
         get_connection=get_connection,
-        log_activity=log_activity,
         ActivityEvent=ActivityEvent,
         clean_unused_tags=clean_unused_tags,
         clear_all_tags=clear_all_tags,

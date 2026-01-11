@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+"""UI routes that render templates and handle form submissions."""
+
 from datetime import datetime
 from pathlib import Path
 
@@ -7,7 +9,7 @@ from fastapi import APIRouter, Form, Request, Response
 from fastapi.responses import FileResponse
 from fastapi.responses import RedirectResponse
 
-from ..db import (
+from ..services.db_queries import (
     fetch_author_name,
     fetch_authors,
     fetch_book_detail,
@@ -17,7 +19,10 @@ from ..db import (
     fetch_tag_name,
     fetch_tag_rows_for_recommendations,
     fetch_tags_with_counts,
+    get_book_tags,
+    log_activity,
 )
+from ..services.ui_helpers import format_bytes, normalize_search, split_tags
 
 
 def build_ui_router(
@@ -25,22 +30,19 @@ def build_ui_router(
     templates,
     get_connection,
     get_dashboard_data,
-    get_book_tags,
     add_tags_to_book,
     remove_tag_from_book,
     get_or_create_tag,
-    log_activity,
     ActivityEvent,
-    split_tags,
-    normalize_search,
-    format_bytes,
     TAG_NAMESPACE_CONFIG,
     TAG_NAMESPACE_LIST,
 ) -> APIRouter:
+    """Create the UI router and bind template handlers to dependencies."""
     router = APIRouter()
 
     @router.get("/")
     def ui_dashboard(request: Request):
+        """Render the dashboard with totals and recent activity."""
         totals, formatted_activity = get_dashboard_data()
         return templates.TemplateResponse(
             "dashboard.html",
@@ -57,6 +59,7 @@ def build_ui_router(
 
     @router.get("/bulk-actions")
     def ui_bulk_actions(request: Request):
+        """Render the bulk-actions page."""
         return templates.TemplateResponse(
             "bulk_actions.html",
             {"request": request, "tag_namespaces": TAG_NAMESPACE_LIST},
@@ -64,11 +67,13 @@ def build_ui_router(
 
     @router.get("/summary")
     def ui_summary() -> dict[str, object]:
+        """Return summary data for dashboard polling."""
         totals, formatted_activity = get_dashboard_data()
         return {"totals": dict(totals), "activity": formatted_activity}
 
     @router.get("/recommendations")
     def ui_recommendations(request: Request):
+        """Render recommendations based on selected tag filters."""
         def _unique_ids(values: list[int]) -> list[int]:
             return list(dict.fromkeys(values))
 
@@ -157,6 +162,7 @@ def build_ui_router(
         tag_id: int | None = None,
         q: str | None = None,
     ):
+        """Render a filtered book list by author, tag, or search term."""
         author_name = None
         tag_name = None
         search_term = normalize_search(q)
@@ -190,6 +196,7 @@ def build_ui_router(
 
     @router.get("/authors")
     def ui_authors(request: Request):
+        """Render the authors list with book counts."""
         with get_connection() as conn:
             rows = fetch_authors(conn)
         return templates.TemplateResponse(
@@ -199,6 +206,7 @@ def build_ui_router(
 
     @router.get("/tags")
     def ui_tags(request: Request):
+        """Render the tag list (excluding topics)."""
         with get_connection() as conn:
             rows = fetch_tags_with_counts(conn, include_topics=False)
         return templates.TemplateResponse(
@@ -208,6 +216,7 @@ def build_ui_router(
 
     @router.get("/topics")
     def ui_topics(request: Request):
+        """Render the topic list (topic: namespace)."""
         with get_connection() as conn:
             rows = fetch_tags_with_counts(conn, include_topics=True)
         topics = [
@@ -226,6 +235,7 @@ def build_ui_router(
 
     @router.post("/tags")
     def ui_add_tags(tags: str = Form(...)) -> RedirectResponse:
+        """Create new topic tags from the tags form."""
         tag_names = split_tags(tags)
         tag_names = [
             name if name.lower().startswith("topic:") else f"topic:{name}"
@@ -241,6 +251,7 @@ def build_ui_router(
 
     @router.get("/books/{book_id}")
     def ui_book_detail(request: Request, book_id: int):
+        """Render a single book detail page with tags and files."""
         with get_connection() as conn:
             book = fetch_book_detail(conn, book_id)
             tags = get_book_tags(conn, book_id)
@@ -277,6 +288,7 @@ def build_ui_router(
 
     @router.post("/books/{book_id}/tags")
     def ui_add_book_tags(book_id: int, tags: str = Form(...)) -> RedirectResponse:
+        """Attach topic tags to a book and log the update."""
         tag_names = split_tags(tags)
         tag_names = [
             name if name.lower().startswith("topic:") else f"topic:{name}"
@@ -300,6 +312,7 @@ def build_ui_router(
 
     @router.post("/books/{book_id}/tags/{tag_id}/remove")
     def ui_remove_book_tag(book_id: int, tag_id: int) -> RedirectResponse:
+        """Remove a tag from a book and clean up unused tags."""
         with get_connection() as conn:
             removed = remove_tag_from_book(conn, book_id, tag_id)
             log_activity(

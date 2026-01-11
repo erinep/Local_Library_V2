@@ -8,59 +8,125 @@
   </section>
 
   <section class="section bulk-actions-grid">
-    <div class="card">
-      <h3>Scan library</h3>
-      <p class="note">Index files and refresh totals.</p>
-      <button class="btn" type="button" data-scan>Run scan</button>
-      <p class="note" id="scan-status">Idle</p>
+    <div class="card bulk-actions-section">
+      <h3>Core workflows</h3>
+      <p class="note">Primary tasks for maintaining and enriching the library.</p>
+      <div class="list">
+        <div class="list-item">
+          <div class="bulk-actions-info">
+            <h4>Scan library</h4>
+            <p class="note">Index files and refresh totals.</p>
+          </div>
+          <div class="bulk-actions-action">
+            <button class="btn" type="button" data-scan>Run scan</button>
+            <p class="note" id="scan-status">Idle</p>
+          </div>
+        </div>
+        <div class="list-item">
+          <div class="bulk-actions-info">
+            <h4>Bulk tag books</h4>
+            <p class="note">Search Google Books for each title and apply tags.</p>
+          </div>
+          <div class="bulk-actions-action">
+            <button class="btn btn-outline" type="button" data-bulk-tags>Start bulk tagging</button>
+          </div>
+        </div>
+        <div class="list-item">
+          <div class="bulk-actions-info">
+            <h4>Normalize authors</h4>
+            <p class="note">Generate normalized author names for matching.</p>
+          </div>
+          <div class="bulk-actions-action">
+            <button class="btn btn-outline" type="button" data-normalize-authors>
+              Normalize authors
+            </button>
+            <p class="note" id="normalize-authors-status">Idle</p>
+          </div>
+        </div>
+        <div class="list-item">
+          <div class="bulk-actions-info">
+            <h4>Normalize titles</h4>
+            <p class="note">Generate normalized titles for matching.</p>
+          </div>
+          <div class="bulk-actions-action">
+            <button class="btn btn-outline" type="button" data-normalize-titles>
+              Normalize titles
+            </button>
+            <p class="note" id="normalize-titles-status">Idle</p>
+          </div>
+        </div>
+      </div>
     </div>
-    <div class="card">
-      <h3>Bulk tag books</h3>
-      <p class="note">Search Google Books for each title and apply tags.</p>
-      <button class="btn btn-outline" type="button" data-bulk-tags>Start bulk tagging</button>
+
+    <div class="card bulk-actions-section">
+      <h3>Data transfer</h3>
+      <p class="note">Move metadata in and out of the library.</p>
+      <div class="list">
+        <div class="list-item">
+          <div class="bulk-actions-info">
+            <h4>Export books</h4>
+            <p class="note">
+              Download a CSV with book id, title, author, and tags.
+            </p>
+          </div>
+          <div class="bulk-actions-action">
+            <a class="btn btn-outline" href="/bulk-actions/export">Download CSV</a>
+          </div>
+        </div>
+        <div class="list-item">
+          <div class="bulk-actions-info">
+            <h4>Import tags from CSV</h4>
+            <p class="note">Upload a CSV and apply namespaced tags to books.</p>
+          </div>
+          <div class="bulk-actions-action">
+            <button class="btn btn-outline" type="button" data-csv-import>Import tags</button>
+          </div>
+        </div>
+      </div>
     </div>
-    <div class="card">
-      <h3>Export books</h3>
-      <p class="note">
-        Download a CSV snapshot of the library. The file includes book id, title, author, and a comma-separated list
-        of tags for each book.
-      </p>
-      <a class="btn btn-outline" href="/bulk-actions/export">Download CSV</a>
+
+    <div class="card bulk-actions-section">
+      <h3>Tag maintenance</h3>
+      <p class="note">Keep tag metadata tidy.</p>
+      <div class="list">
+        <div class="list-item">
+          <div class="bulk-actions-info">
+            <h4>Clean unused tags</h4>
+            <p class="note">Remove tag entries that are no longer associated with any books.</p>
+          </div>
+          <div class="bulk-actions-action">
+            <button class="btn btn-outline" type="button" data-clean-tags>Delete unused tags</button>
+            <p class="note" id="clean-tags-status">Idle</p>
+          </div>
+        </div>
+      </div>
     </div>
-    <div class="card">
-      <h3>Import tags from CSV</h3>
-      <p class="note">Upload a CSV and apply namespaced tags to books.</p>
-      <button class="btn btn-outline" type="button" data-csv-import>Import tags</button>
-    </div>
-    <div class="card">
-      <h3>Clean unused tags</h3>
-      <p class="note">Remove tag entries that are no longer associated with any books.</p>
-      <button class="btn btn-outline" type="button" data-clean-tags>Delete unused tags</button>
-      <p class="note" id="clean-tags-status">Idle</p>
-    </div>
-    <div class="card">
-      <h3>Normalize authors</h3>
-      <p class="note">Generate normalized author names for matching.</p>
-      <button class="btn btn-outline" type="button" data-normalize-authors>Normalize authors</button>
-      <p class="note" id="normalize-authors-status">Idle</p>
-    </div>
-    <div class="card">
-      <h3>Normalize titles</h3>
-      <p class="note">Generate normalized titles for matching.</p>
-      <button class="btn btn-outline" type="button" data-normalize-titles>Normalize titles</button>
-      <p class="note" id="normalize-titles-status">Idle</p>
-    </div>
-    <div class="card">
-      <h3>Clear all tags</h3>
-      <p class="note">Remove every tag and clear all book-tag links.</p>
-      <button class="btn btn-outline" type="button" data-clear-tags>Clear all tags</button>
-      <p class="note" id="clear-tags-status">Idle</p>
-    </div>
-    <div class="card">
-      <h3>Clear database</h3>
-      <p class="note">Remove all tables and recreate an empty database.</p>
-      <button class="btn btn-outline" type="button" data-clear-database>Clear database</button>
-      <p class="note" id="clear-database-status">Idle</p>
+
+    <div class="card bulk-actions-section bulk-actions-danger">
+      <h3>Danger zone</h3>
+      <p class="note">Destructive operations. Use only when needed.</p>
+      <div class="list">
+        <div class="list-item">
+          <div class="bulk-actions-info">
+            <h4>Clear all tags</h4>
+            <p class="note">Remove every tag and clear all book-tag links.</p>
+          </div>
+          <div class="bulk-actions-action">
+            <button class="btn btn-outline" type="button" data-clear-tags>Clear all tags</button>
+            <p class="note" id="clear-tags-status">Idle</p>
+          </div>
+        </div>
+        <div class="list-item">
+          <div class="bulk-actions-info">
+            <h4>Clear database</h4>
+            <p class="note">Remove all tables and recreate an empty database.</p>
+          </div>
+          <div class="bulk-actions-action">
+            <button class="btn btn-outline" type="button" data-clear-database>Clear database</button>
+            <p class="note" id="clear-database-status">Idle</p>
+          </div>
+        </div>
+      </div>
     </div>
   </section>
 
