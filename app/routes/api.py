@@ -3,7 +3,14 @@ from __future__ import annotations
 from datetime import datetime
 from fastapi import APIRouter, HTTPException
 
-from ..schemas import BookSearchResult, ScanResult, TagCandidateResult
+from ..schemas import (
+    BookDescriptionResult,
+    BookDescriptionUpdate,
+    BookSearchResult,
+    ScanResult,
+    TagCandidateResult,
+)
+from ..services.db_queries import fetch_book_detail, update_book_description
 
 
 def build_api_router(
@@ -63,5 +70,37 @@ def build_api_router(
             TagCandidateResult(tag_text=tag.tag_text)
             for tag in tags
         ]
+
+    @router.post("/books/{book_id}/description/generate", response_model=BookDescriptionResult)
+    def generate_description(book_id: int) -> BookDescriptionResult:
+        """Generate a book description using the metadata provider (no save)."""
+        with get_connection() as conn:
+            book = fetch_book_detail(conn, book_id)
+            if book is None:
+                raise HTTPException(status_code=404, detail="Book not found.")
+            title = book["normalized_title"] or book["title"] or ""
+            author = book["normalized_author"] or book["author"] or ""
+            description = books_provider.get_description(title=title, author=author)
+        return BookDescriptionResult(book_id=book_id, description=description)
+
+    @router.post("/books/{book_id}/description", response_model=BookDescriptionResult)
+    def save_description(book_id: int, payload: BookDescriptionUpdate) -> BookDescriptionResult:
+        """Save a book description to the database."""
+        with get_connection() as conn:
+            book = fetch_book_detail(conn, book_id)
+            if book is None:
+                raise HTTPException(status_code=404, detail="Book not found.")
+            update_book_description(conn, book_id, payload.description)
+        return BookDescriptionResult(book_id=book_id, description=payload.description)
+
+    @router.delete("/books/{book_id}/description", response_model=BookDescriptionResult)
+    def clear_description(book_id: int) -> BookDescriptionResult:
+        """Clear a book description from the database."""
+        with get_connection() as conn:
+            book = fetch_book_detail(conn, book_id)
+            if book is None:
+                raise HTTPException(status_code=404, detail="Book not found.")
+            update_book_description(conn, book_id, None)
+        return BookDescriptionResult(book_id=book_id, description=None)
 
     return router

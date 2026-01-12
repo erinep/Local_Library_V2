@@ -30,3 +30,7 @@ class MetadataProvider(Protocol):
     def get_tags(self, result_id: str) -> list[TagCandidate]:
         """Return tag candidates for a specific result id."""
         raise NotImplementedError
+
+    def get_description(self, title: str, author: str) -> str | None:
+        """Return a description for a title/author pair."""
+        raise NotImplementedError

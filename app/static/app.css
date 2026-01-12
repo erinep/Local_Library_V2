@@ -341,6 +341,32 @@ nav a:hover {
   color: var(--ink);
 }
 
+.description-box {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 12px;
+  background: #fffdf7;
+  min-height: 80px;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.description-box .note {
+  margin: 0;
+}
+
+.description-confirm {
+  margin-top: 12px;
+  display: grid;
+  gap: 10px;
+}
+
+.description-box-preview {
+  min-height: 120px;
+  background: #f8f1e5;
+  border-style: dashed;
+}
+
 .tag-pill-proposed {
   background: rgba(209, 123, 15, 0.12);
   border-color: rgba(209, 123, 15, 0.35);

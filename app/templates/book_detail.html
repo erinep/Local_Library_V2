@@ -41,6 +41,42 @@
       </div>
     </div>
     <div class="card">
+      <h3>Description</h3>
+      <div class="description-box" data-description-text>
+        {% if book['description'] %}
+          {{ book['description'] }}
+        {% else %}
+          <p class="note">No description yet.</p>
+        {% endif %}
+      </div>
+      <div class="description-confirm" data-description-confirm hidden>
+        <p class="note">Review the generated description:</p>
+        <div class="description-box description-box-preview" data-description-preview></div>
+        <div class="tag-form">
+          <button class="btn btn-outline btn-small" type="button" data-description-accept>Accept</button>
+          <button class="btn btn-outline btn-small" type="button" data-description-reject>Reject</button>
+        </div>
+      </div>
+      <p class="note" data-description-status hidden></p>
+      <button
+        class="btn btn-outline btn-small"
+        type="button"
+        data-generate-description
+        data-book-id="{{ book['id'] }}"
+      >
+        Generate description
+      </button>
+      <button
+        class="btn btn-outline btn-small"
+        type="button"
+        data-clear-description
+        data-book-id="{{ book['id'] }}"
+        {% if not book['description'] %}disabled{% endif %}
+      >
+        Clear description
+      </button>
+    </div>
+    <div class="card">
       <h3>Topics</h3>
       <form class="tag-form" method="post" action="/books/{{ book['id'] }}/tags">
         <input class="input" type="text" name="tags" placeholder="Add topics, comma separated" />

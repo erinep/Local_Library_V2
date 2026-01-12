@@ -16,6 +16,15 @@ class TagCandidateResult(BaseModel):
     tag_text: str
 
 
+class BookDescriptionResult(BaseModel):
+    book_id: int
+    description: str | None = None
+
+
+class BookDescriptionUpdate(BaseModel):
+    description: str | None = None
+
+
 class BookTagSummary(BaseModel):
     book_id: int
     title: str

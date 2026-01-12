@@ -92,6 +92,10 @@ class GoogleBooksProvider:
                 tags.append(TagCandidate(tag_text=f"topic:{normalized}"))
         return tags
 
+    def get_description(self, title: str, author: str) -> str | None:
+        """Google Books provider does not supply LLM descriptions."""
+        return None
+
     def _fetch_volume(self, result_id: str) -> dict[str, object] | None:
         """Load raw volume metadata from Google Books by id."""
         if not result_id:

@@ -65,6 +65,7 @@ def init_db(conn: sqlite3.Connection) -> None:
             path TEXT UNIQUE NOT NULL,
             created_at REAL NOT NULL,
             normalized_title TEXT,
+            description TEXT,
             FOREIGN KEY(author_id) REFERENCES authors(id)
         );
         CREATE TABLE IF NOT EXISTS tags (
@@ -92,6 +93,9 @@ def init_db(conn: sqlite3.Connection) -> None:
         CREATE INDEX IF NOT EXISTS idx_books_author_id ON books(author_id);
         """
     )
+    columns = {row["name"] for row in conn.execute("PRAGMA table_info(books)").fetchall()}
+    if "description" not in columns:
+        conn.execute("ALTER TABLE books ADD COLUMN description TEXT")
     conn.commit()
 
 

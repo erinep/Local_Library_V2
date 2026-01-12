@@ -4,6 +4,7 @@ from __future__ import annotations
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from dotenv import load_dotenv
 
 from .config import (
     get_tag_namespace_config,
@@ -32,6 +33,8 @@ from .routes.ui import build_ui_router
 from .services.db_queries import log_activity
 from .services.ingest import infer_book_id
 from .services.ui_helpers import get_dashboard_data, urlencode_value
+
+load_dotenv()
 
 app = FastAPI(title="Audiobook Library Backend")
 _books_provider = get_default_provider()
