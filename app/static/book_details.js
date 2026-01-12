@@ -10,6 +10,9 @@
     const descriptionPreview = document.querySelector("[data-description-preview]");
     const descriptionAccept = document.querySelector("[data-description-accept]");
     const descriptionReject = document.querySelector("[data-description-reject]");
+    const topicInput = document.querySelector("[data-topic-input]");
+    const topicSuggest = document.querySelector("[data-topic-suggest]");
+    const topicForm = document.querySelector("[data-topic-form]");
     const statusLine = document.querySelector("[data-search-status]");
     const resultsList = document.querySelector("[data-search-results]");
     const tagsList = document.querySelector("[data-search-tags]");
@@ -68,6 +71,34 @@
         if (!descriptionConfirm || !descriptionPreview) return;
         descriptionPreview.textContent = "";
         descriptionConfirm.setAttribute("hidden", "");
+    };
+
+    const normalizeText = (value) => value.toLowerCase().trim();
+
+    const filterTopicSuggestions = () => {
+        if (!topicInput || !topicSuggest) return;
+        const query = normalizeText(topicInput.value);
+        const items = topicSuggest.querySelectorAll(".topic-suggest-item");
+        let visible = 0;
+        items.forEach((item) => {
+            const label = item.dataset.topicLabel || "";
+            const matches = !query || normalizeText(label).includes(query);
+            item.toggleAttribute("hidden", !matches);
+            if (matches) {
+                visible += 1;
+            }
+        });
+        if (visible > 0) {
+            topicSuggest.removeAttribute("hidden");
+        } else {
+            topicSuggest.setAttribute("hidden", "");
+        }
+    };
+
+    const submitTopic = (label) => {
+        if (!topicInput || !topicForm || !label) return;
+        topicInput.value = label;
+        topicForm.submit();
     };
 
     const renderTags = (tags) => {
@@ -200,6 +231,33 @@
 
     searchButton.addEventListener("click", () => {
         runSearch();
+    });
+
+    if (topicInput) {
+        topicInput.addEventListener("focus", filterTopicSuggestions);
+        topicInput.addEventListener("input", filterTopicSuggestions);
+    }
+
+    if (topicSuggest) {
+        topicSuggest.addEventListener("click", (event) => {
+            const target = event.target;
+            if (!(target instanceof HTMLElement)) {
+                return;
+            }
+            if (!target.dataset.topicLabel) {
+                return;
+            }
+            submitTopic(target.dataset.topicLabel);
+        });
+    }
+
+    document.addEventListener("click", (event) => {
+        if (!topicSuggest || !topicInput) return;
+        const target = event.target;
+        if (target === topicInput || topicSuggest.contains(target)) {
+            return;
+        }
+        topicSuggest.setAttribute("hidden", "");
     });
 
     if (descriptionButton) {

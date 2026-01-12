@@ -78,12 +78,20 @@
     </div>
     <div class="card">
       <h3>Topics</h3>
-      <form class="tag-form" method="post" action="/books/{{ book['id'] }}/tags">
-        <input class="input" type="text" name="tags" placeholder="Add topics, comma separated" />
+      <form class="tag-form" method="post" action="/books/{{ book['id'] }}/tags" data-topic-form>
+        <input
+          class="input"
+          type="text"
+          name="tags"
+          autocomplete="off"
+          placeholder="Add topics, comma separated"
+          data-topic-input
+        />
+        {% include "components/topic_suggest.html" %}
         <button class="btn btn-outline btn-small" type="submit">Add</button>
       </form>
       <div class="tag-list">
-        {% for topic in topics %}
+        {% for topic in active_topics %}
           <div class="tag-pill">
             <a href="/books?tag_id={{ topic['id'] }}">{{ topic['display_name'] }}</a>
             <form method="post" action="/books/{{ book['id'] }}/tags/{{ topic['id'] }}/remove">

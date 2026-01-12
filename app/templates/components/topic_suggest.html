@@ -1,0 +1,12 @@
+<div class="topic-suggest" data-topic-suggest hidden>
+  {% for tag in topics %}
+    <button
+      class="topic-suggest-item"
+      type="button"
+      data-topic-id="{{ tag['id'] }}"
+      data-topic-label="{{ tag['display_name'] }}"
+    >
+      {{ tag['display_name'] }}
+    </button>
+  {% endfor %}
+</div>

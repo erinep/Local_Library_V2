@@ -259,26 +259,39 @@ def build_ui_router(
         with get_connection() as conn:
             book = fetch_book_detail(conn, book_id)
             tags = get_book_tags(conn, book_id)
+            topic_rows = fetch_tags_with_counts(conn, include_topics=True)
             files = fetch_book_files(conn, book_id)
         if book is None:
             return Response(status_code=404)
+        active_topics = [
+            {
+                "id": tag["id"],
+                "name": tag["name"],
+                "display_name": str(tag["name"]).split(":", 1)[1].strip()
+                if ":" in str(tag["name"])
+                else tag["name"],
+            }
+            for tag in tags
+            if str(tag["name"]).lower().startswith("topic:")
+        ]
+        all_topics = [
+            {
+                "id": row["id"],
+                "name": row["name"],
+                "display_name": row["name"].split(":", 1)[1].strip()
+                if ":" in row["name"]
+                else row["name"],
+            }
+            for row in topic_rows
+        ]
         return templates.TemplateResponse(
             "book_detail.html",
             {
                 "request": request,
                 "book": book,
                 "tags": [tag for tag in tags if not str(tag["name"]).lower().startswith("topic:")],
-                "topics": [
-                    {
-                        "id": tag["id"],
-                        "name": tag["name"],
-                        "display_name": str(tag["name"]).split(":", 1)[1].strip()
-                        if ":" in str(tag["name"])
-                        else tag["name"],
-                    }
-                    for tag in tags
-                    if str(tag["name"]).lower().startswith("topic:")
-                ],
+                "active_topics": active_topics,
+                "topics": all_topics,
                 "files": [
                     {
                         "path": row["path"],

@@ -30,7 +30,6 @@
             <input
               class="input"
               type="text"
-              list="topic-options"
               name="topic_query"
               placeholder="Search topics"
               autocomplete="off"
@@ -38,18 +37,7 @@
             />
             <button class="btn btn-outline btn-small" type="button" data-topic-add>Add</button>
           </div>
-          <div class="topic-suggest" data-topic-suggest hidden>
-            {% for tag in topics %}
-              <button
-                class="topic-suggest-item"
-                type="button"
-                data-topic-id="{{ tag['id'] }}"
-                data-topic-label="{{ tag['display_name'] }}"
-              >
-                {{ tag['display_name'] }}
-              </button>
-            {% endfor %}
-          </div>
+          {% include "components/topic_suggest.html" %}
         </div>
       </div>
       <div class="tag-list tag-list-topics" data-topic-badges>
