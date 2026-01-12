@@ -9,17 +9,11 @@ from fastapi import APIRouter, File, Form, HTTPException, Response, UploadFile
 
 from ..services.db_queries import (
     book_exists,
-    fetch_authors_for_normalization,
-    fetch_books_for_normalization,
-    fetch_books_with_authors_and_tags,
     fetch_bulk_export_rows,
     log_activity,
-    update_normalized_author,
-    update_normalized_title,
 )
 from ..services.ingest import parse_tag_columns
-from ..services.normalization import normalize_author, normalize_title
-from ..schemas import BookTagSummary, BulkTagImportResult, BulkTaggingResult
+from ..schemas import BulkTagImportResult
 
 def build_bulk_actions_router(
     *,
@@ -35,39 +29,6 @@ def build_bulk_actions_router(
 ) -> APIRouter:
     """Create the bulk-actions router and wire handlers to injected services."""
     router = APIRouter()
-
-    @router.get("/bulk-actions/books", response_model=list[BookTagSummary])
-    def bulk_actions_books() -> list[BookTagSummary]:
-        """Return book summaries (with tags) for the bulk-tagging UI."""
-        with get_connection() as conn:
-            rows = fetch_books_with_authors_and_tags(conn)
-        books: dict[int, BookTagSummary] = {}
-        for row in rows:
-            book_id = int(row["book_id"])
-            entry = books.get(book_id)
-            if entry is None:
-                entry = BookTagSummary(
-                    book_id=book_id,
-                    title=row["title"],
-                    author=row["author"],
-                    normalized_title=row["normalized_title"],
-                    normalized_author=row["normalized_author"],
-                    tags=[],
-                )
-                books[book_id] = entry
-            tag_name = row["tag_name"]
-            if tag_name:
-                entry.tags.append(tag_name)
-        results = list(books.values())
-        with get_connection() as conn:
-            log_activity(
-                conn,
-                ActivityEvent.BULK_TAGGING_STARTED,
-                f"{len(results)} books loaded for bulk tagging",
-                metadata={"book_count": len(results)},
-                source="bulk_actions_books",
-            )
-        return results
 
     @router.get("/bulk-actions/export")
     def bulk_actions_export() -> Response:
@@ -171,67 +132,6 @@ def build_bulk_actions_router(
                 source="clear_database",
             )
         return {"status": "cleared"}
-
-    @router.post("/bulk-actions/normalize-authors")
-    def bulk_actions_normalize_authors() -> dict[str, int]:
-        """Normalize author names and store results in the authors table."""
-        with get_connection() as conn:
-            rows = fetch_authors_for_normalization(conn)
-            updated = 0
-            for row in rows:
-                normalized = normalize_author(row["name"])
-                update_normalized_author(conn, int(row["id"]), normalized)
-                updated += 1
-            conn.commit()
-            log_activity(
-                conn,
-                ActivityEvent.NORMALIZE_AUTHORS,
-                f"normalized {updated} authors",
-                metadata={"authors": updated},
-                source="normalize_authors",
-            )
-        return {"normalized": updated}
-
-    @router.post("/bulk-actions/normalize-titles")
-    def bulk_actions_normalize_titles() -> dict[str, int]:
-        """Normalize book titles and store results in the books table."""
-        with get_connection() as conn:
-            rows = fetch_books_for_normalization(conn)
-            updated = 0
-            for row in rows:
-                normalized = normalize_title(row["title"])
-                update_normalized_title(conn, int(row["id"]), normalized)
-                updated += 1
-            conn.commit()
-            log_activity(
-                conn,
-                ActivityEvent.NORMALIZE_TITLES,
-                f"normalized {updated} titles",
-                metadata={"books": updated},
-                source="normalize_titles",
-            )
-        return {"normalized": updated}
-
-    @router.post("/bulk-actions/complete")
-    def bulk_actions_complete(payload: BulkTaggingResult) -> dict[str, int | None | str]:
-        """Record completion or stop status for the bulk-tagging session."""
-        normalized = payload.status.lower()
-        if normalized not in {"completed", "stopped"}:
-            normalized = "completed"
-        with get_connection() as conn:
-            log_activity(
-                conn,
-                ActivityEvent.BULK_TAGGING_COMPLETED,
-                f"bulk tagging {normalized}",
-                status="success" if normalized == "completed" else "stopped",
-                metadata={
-                    "processed": payload.processed,
-                    "total": payload.total,
-                    "status": normalized,
-                },
-                source="bulk_tagging_complete",
-            )
-        return {"processed": payload.processed, "total": payload.total, "status": normalized}
 
     @router.post("/bulk-actions/import-tags", response_model=BulkTagImportResult)
     async def bulk_actions_import_tags(

@@ -79,26 +79,6 @@ def fetch_recent_activity(conn: sqlite3.Connection, limit: int = 8) -> list[sqli
     ).fetchall()
 
 
-def fetch_books_with_authors_and_tags(conn: sqlite3.Connection) -> list[sqlite3.Row]:
-    """Fetch books, authors, and tags for bulk tagging in app/routes/bulk_actions.py."""
-    return conn.execute(
-        """
-        SELECT
-            b.id AS book_id,
-            b.title AS title,
-            a.name AS author,
-            b.normalized_title AS normalized_title,
-            a.normalized_author AS normalized_author,
-            t.name AS tag_name
-        FROM books b
-        LEFT JOIN authors a ON a.id = b.author_id
-        LEFT JOIN book_tags bt ON bt.book_id = b.id
-        LEFT JOIN tags t ON t.id = bt.tag_id
-        ORDER BY a.name, b.title, t.name
-        """
-    ).fetchall()
-
-
 def fetch_bulk_export_rows(conn: sqlite3.Connection) -> list[sqlite3.Row]:
     """Fetch export rows for CSV in app/routes/bulk_actions.py."""
     return conn.execute(
@@ -320,52 +300,6 @@ def book_exists(conn: sqlite3.Connection, book_id: int) -> bool:
     """Check book existence during CSV import in app/routes/bulk_actions.py."""
     row = conn.execute("SELECT 1 FROM books WHERE id = ?", (book_id,)).fetchone()
     return row is not None
-
-
-def fetch_authors_for_normalization(conn: sqlite3.Connection) -> list[sqlite3.Row]:
-    """Fetch authors to normalize in app/routes/bulk_actions.py."""
-    return conn.execute(
-        """
-        SELECT id, name
-        FROM authors
-        ORDER BY id
-        """
-    ).fetchall()
-
-
-def fetch_books_for_normalization(conn: sqlite3.Connection) -> list[sqlite3.Row]:
-    """Fetch books to normalize in app/routes/bulk_actions.py."""
-    return conn.execute(
-        """
-        SELECT id, title
-        FROM books
-        ORDER BY id
-        """
-    ).fetchall()
-
-
-def update_normalized_author(conn: sqlite3.Connection, author_id: int, normalized: str | None) -> None:
-    """Update normalized author names in app/routes/bulk_actions.py."""
-    conn.execute(
-        """
-        UPDATE authors
-        SET normalized_author = ?
-        WHERE id = ?
-        """,
-        (normalized, author_id),
-    )
-
-
-def update_normalized_title(conn: sqlite3.Connection, book_id: int, normalized: str | None) -> None:
-    """Update normalized titles in app/routes/bulk_actions.py."""
-    conn.execute(
-        """
-        UPDATE books
-        SET normalized_title = ?
-        WHERE id = ?
-        """,
-        (normalized, book_id),
-    )
 
 
 def log_activity(

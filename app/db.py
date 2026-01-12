@@ -15,11 +15,7 @@ class ActivityEvent(str, Enum):
     EXPORT_LIBRARY_CSV = "export_library_csv"
     CLEAN_UNUSED_TAGS = "clean_unused_tags"
     BOOK_TAGS_UPDATED = "book_tags_updated"
-    BULK_TAGGING_STARTED = "bulk_tagging_started"
-    BULK_TAGGING_COMPLETED = "bulk_tagging_completed"
     BULK_TAG_IMPORT = "bulk_tag_import"
-    NORMALIZE_TITLES = "normalize_titles"
-    NORMALIZE_AUTHORS = "normalize_authors"
     CLEAR_ALL_TAGS = "clear_all_tags"
     CLEAR_DATABASE = "clear_database"
 

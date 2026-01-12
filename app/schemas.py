@@ -25,21 +25,6 @@ class BookDescriptionUpdate(BaseModel):
     description: str | None = None
 
 
-class BookTagSummary(BaseModel):
-    book_id: int
-    title: str
-    author: str | None = None
-    normalized_title: str | None = None
-    normalized_author: str | None = None
-    tags: list[str]
-
-
-class BulkTaggingResult(BaseModel):
-    status: str
-    processed: int | None = None
-    total: int | None = None
-
-
 class BulkTagImportResult(BaseModel):
     status: str
     rows_processed: int
