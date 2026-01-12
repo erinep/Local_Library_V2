@@ -10,9 +10,10 @@ from .providers.llm_provider import LlmProvider
 class CompositeMetadataProvider:
     """Combine search/tag providers with an LLM description provider."""
 
-    def __init__(self, search_provider, description_provider) -> None:
+    def __init__(self, search_provider, description_provider, cleanup_provider )-> None:
         self._search_provider = search_provider
         self._description_provider = description_provider
+        self._cleanup_provider = cleanup_provider
 
     def search(self, author: str, title: str):
         return self._search_provider.search(author=author, title=title)
@@ -24,7 +25,7 @@ class CompositeMetadataProvider:
         return self._description_provider.get_description(title=title, author=author)
 
     def clean_description(self, title: str, author: str, description: str):
-        return self._description_provider.clean_description(
+        return self._cleanup_provider.clean_description(
             title=title,
             author=author,
             description=description,
@@ -36,4 +37,5 @@ def get_default_provider() -> MetadataProvider:
     return CompositeMetadataProvider(
         GoogleBooksProvider(),
         GoogleBooksProvider(),
+        LlmProvider(),
     )

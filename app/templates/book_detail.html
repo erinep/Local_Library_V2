@@ -17,13 +17,12 @@
       <button
         class="btn btn-outline btn-small"
         type="button"
-        data-search-books
-        data-modal-open="search-books"
-        data-title="{{ book['normalized_title'] }}"
-        data-author="{{ book['normalized_author'] or '' }}"
-        data-book-id="{{ book['id'] }}"
+        data-modal-open="fetch-metadata"
+        data-metadata-book-id="{{ book['id'] }}"
+        data-metadata-title="{{ book['normalized_title'] }}"
+        data-metadata-author="{{ book['normalized_author'] or '' }}"
       >
-        Search Google Books
+        Fetch Metadata
       </button>
     </div>
     <div class="card">
@@ -42,6 +41,36 @@
     </div>
     <div class="card">
       <h3>Description</h3>
+      <div class="tag-form description-actions" data-description-actions>
+        <button
+          class="btn btn-outline btn-small btn-ai"
+          type="button"
+          data-clean-description
+          data-book-id="{{ book['id'] }}"
+          data-title="{{ book['normalized_title'] }}"
+          data-author="{{ book['normalized_author'] or '' }}"
+          {% if not book['description'] %}disabled{% endif %}
+        >
+          <span class="ai-label">AI ✨</span>
+          <span class="ai-spinner" aria-hidden="true"></span>
+        </button>
+        <button
+          class="btn btn-outline btn-small btn-danger"
+          type="button"
+          data-clear-description
+          data-book-id="{{ book['id'] }}"
+          {% if not book['description'] %}disabled{% endif %}
+        >
+          Clear description
+        </button>
+      </div>
+      <div class="description-confirm" data-description-confirm hidden>
+        <p class="note">Review the generated description:</p>
+        <div class="tag-form">
+          <button class="btn btn-small btn-accept" type="button" data-description-accept>Accept</button>
+          <button class="btn btn-small btn-reject" type="button" data-description-reject>Reject</button>
+        </div>
+      </div>
       <div class="description-box" data-description-text>
         {% if book['description'] %}
           {{ book['description'] }}
@@ -49,32 +78,7 @@
           <p class="note">No description yet.</p>
         {% endif %}
       </div>
-      <div class="description-confirm" data-description-confirm hidden>
-        <p class="note">Review the generated description:</p>
-        <div class="description-box description-box-preview" data-description-preview></div>
-        <div class="tag-form">
-          <button class="btn btn-outline btn-small" type="button" data-description-accept>Accept</button>
-          <button class="btn btn-outline btn-small" type="button" data-description-reject>Reject</button>
-        </div>
-      </div>
       <p class="note" data-description-status hidden></p>
-      <button
-        class="btn btn-outline btn-small"
-        type="button"
-        data-generate-description
-        data-book-id="{{ book['id'] }}"
-      >
-        Generate description
-      </button>
-      <button
-        class="btn btn-outline btn-small"
-        type="button"
-        data-clear-description
-        data-book-id="{{ book['id'] }}"
-        {% if not book['description'] %}disabled{% endif %}
-      >
-        Clear description
-      </button>
     </div>
     <div class="card">
       <h3>Topics</h3>
@@ -148,12 +152,45 @@
     </div>
   </section>
 
-  {% call modal.modal("search-books", "Google Books Results") %}
-    <p class="note" data-search-status>Loading results...</p>
-    <p class="note" data-search-params></p>
-    <div class="tag-list" data-search-tags></div>
-    <button class="btn btn-outline btn-small" type="button" data-apply-tags disabled>Add tags to book</button>
-    <div class="list" data-search-results></div>
+  {% call modal.modal("fetch-metadata", "Fetch Metadata", 'data-metadata-modal') %}
+    <p class="note" data-metadata-status>Ready to search.</p>
+    <div class="tag-form">
+      <input class="input" type="text" data-metadata-title placeholder="Title" />
+      <input class="input" type="text" data-metadata-author placeholder="Author" />
+      <button class="btn btn-outline btn-small" type="button" data-metadata-search>Search</button>
+    </div>
+    <div class="list" data-metadata-results></div>
+    {% endcall %}
+
+  {% call modal.modal("metadata-review", "Review Metadata", 'data-metadata-review-modal') %}
+    <div class="metadata-review" data-metadata-review>
+      <p class="note">Tags</p>
+      <div class="tag-list" data-metadata-tags></div>
+      
+      <div class="metadata-desc-wrap" data-metadata-desc-wrap>
+        <div>
+        <p class="note">Description</p>
+        <label class="rec-option">
+          <input type="radio" name="metadata-desc-choice" value="include" data-metadata-desc-choice checked />
+          Include description
+        </label>
+        <label class="rec-option">
+          <input type="radio" name="metadata-desc-choice" value="none" data-metadata-desc-choice />
+          Ignore description
+        </label>
+      </div>
+        <textarea class="input metadata-description" rows="6" data-metadata-description></textarea>
+        <button class="btn btn-outline btn-small btn-ai" type="button" data-metadata-clean>
+          <span class="ai-label">AI ✨</span>
+          <span class="ai-spinner" aria-hidden="true"></span>
+        </button>
+      </div>
+      <div class="tag-form">
+        <button class="btn btn-outline btn-small" type="button" data-metadata-back>Back to search</button>
+        <button class="btn btn-outline btn-small" type="button" data-metadata-apply>Apply metadata</button>
+        <button class="btn btn-outline btn-small" type="button" data-modal-close>Cancel</button>
+      </div>
+    </div>
   {% endcall %}
 
 {% endblock %}

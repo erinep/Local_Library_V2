@@ -76,6 +76,8 @@ app.include_router(
             get_or_create_author=get_or_create_author,
             get_or_create_book=get_or_create_book,
         ),
+        get_or_create_tag=get_or_create_tag,
+        add_tags_to_book=add_tags_to_book,
     )
 )
 app.include_router(

@@ -6,16 +6,6 @@ class ScanResult(BaseModel):
     scanned_at: str
 
 
-class BookSearchResult(BaseModel):
-    result_id: str
-    title: str | None = None
-    author: str | None = None
-
-
-class TagCandidateResult(BaseModel):
-    tag_text: str
-
-
 class BookDescriptionResult(BaseModel):
     book_id: int
     description: str | None = None
@@ -23,6 +13,58 @@ class BookDescriptionResult(BaseModel):
 
 class BookDescriptionUpdate(BaseModel):
     description: str | None = None
+
+
+class MetadataSearchRequest(BaseModel):
+    title: str | None = None
+    author: str | None = None
+
+
+class MetadataSearchResult(BaseModel):
+    result_id: str
+    title: str | None = None
+    author: str | None = None
+    published_year: str | None = None
+    categories: list[str] = []
+    description: str | None = None
+    source: str | None = None
+
+
+class MetadataPrepareRequest(BaseModel):
+    result_id: str
+    title: str | None = None
+    author: str | None = None
+    categories: list[str] = []
+    description: str | None = None
+    source: str | None = None
+
+
+class MetadataPrepareResult(BaseModel):
+    tags: list[str]
+    description: str | None = None
+
+
+class MetadataApplyRequest(BaseModel):
+    tags: list[str] = []
+    description_choice: str | None = None
+    description: str | None = None
+    source: str | None = None
+    description_rewritten: bool = False
+
+
+class MetadataCleanRequest(BaseModel):
+    title: str | None = None
+    author: str | None = None
+    description: str | None = None
+
+
+class MetadataCleanResult(BaseModel):
+    description: str | None = None
+
+
+class MetadataApplyResult(BaseModel):
+    tags_added: int
+    description_updated: bool
 
 
 class BulkTagImportResult(BaseModel):

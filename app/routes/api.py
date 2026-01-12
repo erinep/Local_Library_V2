@@ -6,11 +6,20 @@ from fastapi import APIRouter, HTTPException
 from ..schemas import (
     BookDescriptionResult,
     BookDescriptionUpdate,
-    BookSearchResult,
+    MetadataApplyRequest,
+    MetadataApplyResult,
+    MetadataCleanRequest,
+    MetadataCleanResult,
+    MetadataPrepareRequest,
+    MetadataPrepareResult,
+    MetadataSearchRequest,
+    MetadataSearchResult,
     ScanResult,
-    TagCandidateResult,
 )
-from ..services.db_queries import fetch_book_detail, update_book_description
+from ..services.db_queries import (
+    fetch_book_detail,
+    update_book_description,
+)
 
 
 def build_api_router(
@@ -23,6 +32,8 @@ def build_api_router(
     log_activity,
     ActivityEvent,
     infer_book_id,
+    get_or_create_tag,
+    add_tags_to_book,
 ) -> APIRouter:
     router = APIRouter()
 
@@ -51,25 +62,105 @@ def build_api_router(
         scanned_at = datetime.utcnow().isoformat() + "Z"
         return ScanResult(indexed=indexed, scanned_at=scanned_at)
 
-    @router.get("/search", response_model=list[BookSearchResult])
-    def search_books(title: str | None = None, author: str | None = None) -> list[BookSearchResult]:
-        """Search the provider by title/author and return candidate books."""
-        if not title and not author:
-            raise HTTPException(status_code=400, detail="Provide at least a title or author.")
-        results = books_provider.search(author=author or "", title=title or "")
-        return [
-            BookSearchResult(result_id=result.result_id, title=result.title, author=result.author)
-            for result in results
-        ]
+    @router.post("/books/{book_id}/metadata/search", response_model=list[MetadataSearchResult])
+    def metadata_search(book_id: int, payload: MetadataSearchRequest) -> list[MetadataSearchResult]:
+        """Search external metadata sources for a book."""
+        title = payload.title or ""
+        author = payload.author or ""
+        results = books_provider.search(author=author, title=title)
+        response: list[MetadataSearchResult] = []
+        for result in results[:5]:
+            volume = {}
+            if isinstance(result.raw_payload, dict):
+                volume = result.raw_payload.get("volumeInfo", {}) or {}
+            published_date = volume.get("publishedDate") if isinstance(volume, dict) else None
+            published_year = None
+            if isinstance(published_date, str) and published_date:
+                published_year = published_date[:4]
+            categories = volume.get("categories") if isinstance(volume, dict) else None
+            if not isinstance(categories, list):
+                categories = []
+            description = volume.get("description") if isinstance(volume, dict) else None
+            if not isinstance(description, str):
+                description = None
+            response.append(
+                MetadataSearchResult(
+                    result_id=result.result_id,
+                    title=result.title,
+                    author=result.author,
+                    published_year=published_year,
+                    categories=[str(item) for item in categories],
+                    description=description,
+                    source="google_books",
+                )
+            )
+        return response
 
-    @router.get("/search/{result_id}/tags", response_model=list[TagCandidateResult])
-    def search_tags(result_id: str) -> list[TagCandidateResult]:
-        """Fetch tag candidates for a provider result id."""
-        tags = books_provider.get_tags(result_id)
-        return [
-            TagCandidateResult(tag_text=tag.tag_text)
-            for tag in tags
-        ]
+    @router.post("/books/{book_id}/metadata/prepare", response_model=MetadataPrepareResult)
+    def metadata_prepare(book_id: int, payload: MetadataPrepareRequest) -> MetadataPrepareResult:
+        """Prepare external metadata for review."""
+        title = payload.title or ""
+        author = payload.author or ""
+        description = payload.description or ""
+        categories = payload.categories or []
+        topics: list[str] = []
+        seen: set[str] = set()
+        for raw in categories:
+            if not raw:
+                continue
+            parts = [part.strip() for part in str(raw).replace(">", "/").split("/") if part.strip()]
+            for part in parts:
+                key = f"topic:{part}".lower()
+                if key in seen:
+                    continue
+                seen.add(key)
+                topics.append(f"topic:{part}")
+        if payload.result_id:
+            tag_candidates = books_provider.get_tags(payload.result_id)
+            for tag in tag_candidates:
+                tag_text = str(tag.tag_text).strip()
+                if not tag_text:
+                    continue
+                key = tag_text.lower()
+                if key in seen:
+                    continue
+                seen.add(key)
+                topics.append(tag_text)
+        return MetadataPrepareResult(
+            tags=topics,
+            description=description or None,
+        )
+
+    @router.post("/books/{book_id}/metadata/apply", response_model=MetadataApplyResult)
+    def metadata_apply(book_id: int, payload: MetadataApplyRequest) -> MetadataApplyResult:
+        """Apply reviewed metadata to a book."""
+        with get_connection() as conn:
+            book = fetch_book_detail(conn, book_id)
+            if book is None:
+                raise HTTPException(status_code=404, detail="Book not found.")
+            tag_ids: list[int] = []
+            for tag_text in payload.tags:
+                cleaned = " ".join(str(tag_text).split())
+                if not cleaned:
+                    continue
+                tag_id, _ = get_or_create_tag(conn, cleaned)
+                if tag_id is not None:
+                    tag_ids.append(tag_id)
+            added = add_tags_to_book(conn, book_id, tag_ids)
+            description_updated = False
+            if payload.description_choice == "include" and payload.description is not None:
+                update_book_description(conn, book_id, payload.description)
+                description_updated = True
+        return MetadataApplyResult(tags_added=added, description_updated=description_updated)
+
+    @router.post("/books/{book_id}/metadata/clean", response_model=MetadataCleanResult)
+    def metadata_clean(book_id: int, payload: MetadataCleanRequest) -> MetadataCleanResult:
+        """Clean description text using the metadata provider."""
+        title = payload.title or ""
+        author = payload.author or ""
+        description = payload.description or ""
+        cleaned = books_provider.clean_description(title=title, author=author, description=description)
+        return MetadataCleanResult(description=cleaned)
 
     @router.post("/books/{book_id}/description/generate", response_model=BookDescriptionResult)
     def generate_description(book_id: int) -> BookDescriptionResult:
