@@ -28,5 +28,5 @@ def get_default_provider() -> MetadataProvider:
     """Return the default metadata provider used by app/main.py."""
     return CompositeMetadataProvider(
         GoogleBooksProvider(),
-        LlmProvider(),
+        GoogleBooksProvider(),
     )

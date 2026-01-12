@@ -93,8 +93,18 @@ class GoogleBooksProvider:
         return tags
 
     def get_description(self, title: str, author: str) -> str | None:
-        """Google Books provider does not supply LLM descriptions."""
-        return None
+        """Fetch a book description from the first matching Google Books result."""
+        results = self.search(author=author, title=title)
+        if not results:
+            return None
+        volume = self._fetch_volume(results[0].result_id)
+        if not volume:
+            return None
+        description = volume.get("description") if isinstance(volume, dict) else None
+        if not isinstance(description, str):
+            return None
+        cleaned = " ".join(description.split())
+        return cleaned or None
 
     def _fetch_volume(self, result_id: str) -> dict[str, object] | None:
         """Load raw volume metadata from Google Books by id."""
