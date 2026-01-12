@@ -106,6 +106,10 @@ class GoogleBooksProvider:
         cleaned = " ".join(description.split())
         return cleaned or None
 
+    def clean_description(self, title: str, author: str, description: str) -> str | None:
+        """Google Books provider does not clean descriptions."""
+        return None
+
     def _fetch_volume(self, result_id: str) -> dict[str, object] | None:
         """Load raw volume metadata from Google Books by id."""
         if not result_id:

@@ -23,6 +23,13 @@ class CompositeMetadataProvider:
     def get_description(self, title: str, author: str):
         return self._description_provider.get_description(title=title, author=author)
 
+    def clean_description(self, title: str, author: str, description: str):
+        return self._description_provider.clean_description(
+            title=title,
+            author=author,
+            description=description,
+        )
+
 
 def get_default_provider() -> MetadataProvider:
     """Return the default metadata provider used by app/main.py."""

@@ -34,3 +34,7 @@ class MetadataProvider(Protocol):
     def get_description(self, title: str, author: str) -> str | None:
         """Return a description for a title/author pair."""
         raise NotImplementedError
+
+    def clean_description(self, title: str, author: str, description: str) -> str | None:
+        """Return a cleaned description for a title/author pair."""
+        raise NotImplementedError
