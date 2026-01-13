@@ -304,6 +304,19 @@ nav a:hover {
   margin-top: 8px;
 }
 
+.metadata-controls {
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 14px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+}
+
+.metadata-controls .btn-ai {
+  position: static;
+}
+
 .tag-list {
   display: flex;
   flex-wrap: wrap;
@@ -405,6 +418,10 @@ nav a:hover {
 }
 
 .metadata-desc-wrap {
+  position: relative;
+}
+
+.metadata-review {
   position: relative;
 }
 

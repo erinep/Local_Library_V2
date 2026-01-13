@@ -145,31 +145,24 @@
 
   {% call modal.modal("metadata-review", "Review Metadata", 'data-metadata-review-modal') %}
     <div class="metadata-review" data-metadata-review>
+      <div class="metadata-loading" data-metadata-loading hidden>
+        <div class="metadata-loading-panel">
+          <div class="spinner" aria-hidden="true"></div>
+          <p class="note">Processing metadata. Please wait…</p>
+        </div>
+      </div>
       <p class="note">Tags</p>
       <div class="tag-list" data-metadata-tags></div>
       
       <div class="metadata-desc-wrap" data-metadata-desc-wrap>
-        <div>
         <p class="note">Description</p>
-        <label class="rec-option">
-          <input type="radio" name="metadata-desc-choice" value="include" data-metadata-desc-choice checked />
-          Include description
-        </label>
-        <label class="rec-option">
-          <input type="radio" name="metadata-desc-choice" value="none" data-metadata-desc-choice />
-          Ignore description
-        </label>
-      </div>
         <textarea class="input metadata-description" rows="6" data-metadata-description></textarea>
-        <button class="btn btn-outline btn-small btn-ai" type="button" data-metadata-clean>
-          <span class="ai-label">AI ✨</span>
-          <span class="ai-spinner" aria-hidden="true"></span>
-        </button>
       </div>
-      <div class="tag-form">
-        <button class="btn btn-outline btn-small" type="button" data-metadata-back>Back to search</button>
-        <button class="btn btn-outline btn-small" type="button" data-metadata-apply>Apply metadata</button>
-        <button class="btn btn-outline btn-small" type="button" data-modal-close>Cancel</button>
+      <div class="tag-form metadata-controls">
+        <button class="btn btn-outline btn-small" type="button" data-metadata-back>Back</button>
+        <button class="btn btn-outline btn-small btn-ai" type="button" data-metadata-clean>Clean ✨</button>
+        <button class="btn btn-small" type="button" data-metadata-apply>Apply</button>
+        <button class="btn btn-outline btn-danger btn-small" type="button" data-metadata-cancel>Cancel</button>
       </div>
     </div>
   {% endcall %}

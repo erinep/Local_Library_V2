@@ -134,10 +134,11 @@
         const metadataTags = metadataReviewModal.querySelector("[data-metadata-tags]");
         const metadataDescription = metadataReviewModal.querySelector("[data-metadata-description]");
         const metadataApply = metadataReviewModal.querySelector("[data-metadata-apply]");
-        const metadataChoiceInputs = metadataReviewModal.querySelectorAll("[data-metadata-desc-choice]");
         const metadataClean = metadataReviewModal.querySelector("[data-metadata-clean]");
         const metadataDescWrap = metadataReviewModal.querySelector("[data-metadata-desc-wrap]");
         const metadataBack = metadataReviewModal.querySelector("[data-metadata-back]");
+        const metadataCancel = metadataReviewModal.querySelector("[data-metadata-cancel]");
+        const metadataLoading = metadataReviewModal.querySelector("[data-metadata-loading]");
         let activeResult = null;
         let originalDescription = "";
         let rewrittenDescription = "";
@@ -157,9 +158,10 @@
             rewrittenDescription = "";
             activeResult = null;
             activeSource = "google_books";
-            metadataChoiceInputs.forEach((input) => {
-                input.checked = input.value === "include";
-            });
+            if (metadataClean) {
+                metadataClean.disabled = false;
+                metadataClean.removeAttribute("title");
+            }
         };
 
         const renderResults = (results) => {
@@ -280,17 +282,6 @@
             }
         };
 
-        metadataChoiceInputs.forEach((input) => {
-            input.addEventListener("change", () => {
-                if (!metadataDescription) return;
-                if (input.value === "include") {
-                    metadataDescription.value = rewrittenDescription || originalDescription;
-                } else {
-                    metadataDescription.value = "";
-                }
-            });
-        });
-
         if (metadataSearch) {
             metadataSearch.addEventListener("click", async () => {
                 if (!metadataTitle || !metadataAuthor) return;
@@ -323,12 +314,13 @@
                     ? Array.from(metadataTags.querySelectorAll("input[type='checkbox']:checked"))
                         .map((input) => input.value)
                     : [];
-                const choice = Array.from(metadataChoiceInputs).find((input) => input.checked)?.value || "none";
                 const descriptionValue = metadataDescription?.value || "";
+                const hasDescription = descriptionValue.trim().length > 0;
+                const choice = hasDescription ? "include" : "none";
                 const payload = {
                     tags,
                     description_choice: choice,
-                    description: choice === "none" ? null : descriptionValue,
+                    description: hasDescription ? descriptionValue : null,
                     source: activeSource,
                     description_rewritten: !!rewrittenDescription && descriptionValue === rewrittenDescription,
                 };
@@ -361,9 +353,13 @@
                 if (metadataDescWrap) {
                     metadataDescWrap.classList.add("is-loading");
                 }
+                if (metadataLoading) {
+                    metadataLoading.removeAttribute("hidden");
+                }
                 if (metadataApply) {
                     metadataApply.disabled = true;
                 }
+                let cleaned = false;
                 try {
                     const response = await fetch(`/books/${activeBookId}/metadata/clean`, {
                         method: "POST",
@@ -378,14 +374,12 @@
                         throw new Error("Clean failed.");
                     }
                     const payload = await response.json();
-                if (payload.description) {
-                    rewrittenDescription = payload.description;
-                    if (metadataDescription) {
-                        metadataDescription.value = payload.description;
-                    }
-                    metadataChoiceInputs.forEach((input) => {
-                        input.checked = input.value === "include";
-                    });
+                    if (payload.description) {
+                        rewrittenDescription = payload.description;
+                        if (metadataDescription) {
+                            metadataDescription.value = payload.description;
+                        }
+                        cleaned = true;
                     }
                     setMetadataStatus("Description cleaned.");
                 } catch (error) {
@@ -394,8 +388,18 @@
                     if (metadataDescWrap) {
                         metadataDescWrap.classList.remove("is-loading");
                     }
+                    if (metadataLoading) {
+                        metadataLoading.setAttribute("hidden", "");
+                    }
                     if (metadataApply) {
                         metadataApply.disabled = false;
+                    }
+                    if (metadataClean && cleaned) {
+                        metadataClean.disabled = true;
+                        metadataClean.setAttribute(
+                            "title",
+                            "Already cleaned this session. Reopen metadata to run again."
+                        );
                     }
                 }
             });
@@ -406,6 +410,15 @@
                 if (window.ModalController) {
                     window.ModalController.close("metadata-review");
                     window.ModalController.open("fetch-metadata");
+                }
+            });
+        }
+
+        if (metadataCancel) {
+            metadataCancel.addEventListener("click", () => {
+                if (window.ModalController) {
+                    window.ModalController.close("metadata-review");
+                    window.ModalController.close("fetch-metadata");
                 }
             });
         }
@@ -438,6 +451,19 @@
             resetMetadataView();
             setMetadataStatus("Ready to search.");
         });
+
+        if (window.ModalController) {
+            const originalOpen = window.ModalController.open?.bind(window.ModalController);
+            if (originalOpen) {
+                window.ModalController.open = (modalId) => {
+                    if (modalId === "metadata-review" && metadataClean) {
+                        metadataClean.disabled = false;
+                        metadataClean.removeAttribute("title");
+                    }
+                    return originalOpen(modalId);
+                };
+            }
+        }
     }
 
     const copyButtons = document.querySelectorAll("[data-copy-path]");
