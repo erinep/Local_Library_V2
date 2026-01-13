@@ -208,6 +208,7 @@ def fetch_books(
             b.id,
             b.title,
             a.name AS author,
+            substr(b.description, 1, 160) AS description,
             (SELECT COUNT(*) FROM files f WHERE f.book_id = b.id) AS file_count
         FROM books b
         LEFT JOIN authors a ON a.id = b.author_id
