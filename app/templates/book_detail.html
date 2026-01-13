@@ -43,18 +43,6 @@
       <h3>Description</h3>
       <div class="tag-form description-actions" data-description-actions>
         <button
-          class="btn btn-outline btn-small btn-ai"
-          type="button"
-          data-clean-description
-          data-book-id="{{ book['id'] }}"
-          data-title="{{ book['normalized_title'] }}"
-          data-author="{{ book['normalized_author'] or '' }}"
-          {% if not book['description'] %}disabled{% endif %}
-        >
-          <span class="ai-label">AI ✨</span>
-          <span class="ai-spinner" aria-hidden="true"></span>
-        </button>
-        <button
           class="btn btn-outline btn-small btn-danger"
           type="button"
           data-clear-description
@@ -63,13 +51,6 @@
         >
           Clear description
         </button>
-      </div>
-      <div class="description-confirm" data-description-confirm hidden>
-        <p class="note">Review the generated description:</p>
-        <div class="tag-form">
-          <button class="btn btn-small btn-accept" type="button" data-description-accept>Accept</button>
-          <button class="btn btn-small btn-reject" type="button" data-description-reject>Reject</button>
-        </div>
       </div>
       <div class="description-box" data-description-text>
         {% if book['description'] %}

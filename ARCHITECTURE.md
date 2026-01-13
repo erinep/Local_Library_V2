@@ -11,8 +11,8 @@ This document lists the current HTTP endpoints and DB helpers grouped by testing
 - Static assets are served from `app/static`.
 
 ## System responsibilities
+- Metadata providers (`app/metadataProvider.py`, `app/providers/*`) wrap third-party data calls.
 - API routes (`app/routes/api.py`) expose third-party lookup endpoints.
-- Metadata providers (`app/metadataProvider.py`, `app/providers/*`) wrap third-party data providers.
 - UI routes (`app/routes/ui.py`) render templates and handle form submissions.
 - Bulk action routes (`app/routes/bulk_actions.py`) run maintenance workflows.
 - Service modules (`app/services/*`) hold shared logic and DB helpers.
@@ -46,7 +46,16 @@ This document lists the current HTTP endpoints and DB helpers grouped by testing
   - Input: path param `result_id`
   - Returns: JSON array of `{ "tag_text": string }`
 
+- POST `/book/{book_id}/metadata/search` -- fetch all metadata for a book
+- POST `/book/{book_id}/metadata/prepare` -- preform data clean up on metadata
+- POST `/book/{book_id}/metata/clean` -- extra **expensive** clean up operations on the db.
+- POST `/book/{book_id}/metadata/apply` -- push the metadata results to the db
+
 ## Bulk actions (maintenance workflows)
+
+
+
+
 - GET `/bulk-actions/books` -- List books with authors and tags for bulk tagging.
   - Input: none
   - Returns: JSON array of `{ "book_id": int, "title": string, "author": string|null, "tags": string[] }`

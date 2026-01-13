@@ -368,12 +368,6 @@ nav a:hover {
   line-height: 1.5;
 }
 
-.description-box.is-proposed {
-  border-color: rgba(31, 111, 91, 0.45);
-  background: #edf7f2;
-  color: var(--ink);
-}
-
 .description-box .note {
   margin: 0;
 }
@@ -409,19 +403,6 @@ nav a:hover {
 .metadata-desc-wrap.is-loading .btn-ai .ai-spinner {
   display: inline-block;
 }
-
-.description-actions.is-loading .btn-ai .ai-label {
-  display: none;
-}
-
-.description-actions.is-loading .btn-ai .ai-spinner {
-  display: inline-block;
-}
-
-.description-actions .btn-ai {
-  position: static;
-}
-
 
 .metadata-desc-wrap {
   position: relative;
@@ -478,12 +459,6 @@ nav a:hover {
   to {
     transform: rotate(360deg);
   }
-}
-
-.description-confirm {
-  margin-top: 12px;
-  display: grid;
-  gap: 10px;
 }
 
 .description-box-preview {

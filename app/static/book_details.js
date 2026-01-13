@@ -1,12 +1,7 @@
 (() => { 
-    const descriptionButton = document.querySelector("[data-clean-description]");
     const clearDescriptionButton = document.querySelector("[data-clear-description]");
     const descriptionBox = document.querySelector("[data-description-text]");
     const descriptionStatus = document.querySelector("[data-description-status]");
-    const descriptionActions = document.querySelector("[data-description-actions]");
-    const descriptionConfirm = document.querySelector("[data-description-confirm]");
-    const descriptionAccept = document.querySelector("[data-description-accept]");
-    const descriptionReject = document.querySelector("[data-description-reject]");
     const topicInput = document.querySelector("[data-topic-input]");
     const topicSuggest = document.querySelector("[data-topic-suggest]");
     const topicForm = document.querySelector("[data-topic-form]");
@@ -29,15 +24,6 @@
         }
     };
 
-    const getDescriptionPrompt = () => {
-        const title = descriptionButton?.getAttribute("data-title") || "";
-        const author = descriptionButton?.getAttribute("data-author") || "";
-        const parts = [];
-        if (title) parts.push(`Title: ${title}`);
-        if (author) parts.push(`Author: ${author}`);
-        return parts.length ? parts.join(" | ") : "Title: Unknown title | Author: Unknown author";
-    };
-
     const readResponseDetail = async (response) => {
         try {
             const payload = await response.json();
@@ -48,30 +34,6 @@
             // Ignore invalid JSON responses.
         }
         return "";
-    };
-
-    let originalDescriptionHtml = null;
-
-    const showDescriptionConfirm = (text) => {
-        if (!descriptionConfirm || !descriptionBox) return;
-        if (originalDescriptionHtml === null) {
-            originalDescriptionHtml = descriptionBox.innerHTML;
-        }
-        descriptionBox.textContent = text;
-        descriptionBox.classList.add("is-proposed");
-        descriptionConfirm.removeAttribute("hidden");
-    };
-
-    const clearDescriptionConfirm = (restore = true) => {
-        if (!descriptionConfirm || !descriptionBox) return;
-        if (restore && originalDescriptionHtml !== null) {
-            descriptionBox.innerHTML = originalDescriptionHtml;
-        }
-        if (!restore) {
-            originalDescriptionHtml = descriptionBox.innerHTML;
-        }
-        descriptionBox.classList.remove("is-proposed");
-        descriptionConfirm.setAttribute("hidden", "");
     };
 
     const normalizeText = (value) => value.toLowerCase().trim();
@@ -102,9 +64,6 @@
         topicForm.submit();
     };
 
-    const getTitle = () => descriptionButton?.getAttribute("data-title") || "";
-    const getAuthor = () => descriptionButton?.getAttribute("data-author") || "";
-
     if (topicInput) {
         topicInput.addEventListener("focus", filterTopicSuggestions);
         topicInput.addEventListener("input", filterTopicSuggestions);
@@ -132,94 +91,6 @@
         topicSuggest.setAttribute("hidden", "");
     });
 
-    if (descriptionButton) {
-        descriptionButton.addEventListener("click", async () => {
-        const bookId = descriptionButton.getAttribute("data-book-id");
-        if (!bookId || !descriptionBox) return;
-        const currentText = descriptionBox.textContent?.trim() || "";
-        if (!currentText) {
-            setDescriptionStatus("No description to clean.");
-            return;
-        }
-        descriptionButton.disabled = true;
-        descriptionActions?.classList.add("is-loading");
-        setDescriptionStatus(`Cleaning description. Message sent: ${getDescriptionPrompt()}`);
-        try {
-            const response = await fetch(`/books/${bookId}/metadata/clean`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    title: getTitle(),
-                    author: getAuthor(),
-                    description: descriptionBox.textContent || "",
-                }),
-            });
-            if (!response.ok) {
-            const detail = await readResponseDetail(response);
-            throw new Error(detail || "Failed to clean description.");
-            }
-            const payload = await response.json();
-            const text = payload.description;
-            if (text && String(text).toLowerCase() !== "null") {
-                showDescriptionConfirm(text);
-                setDescriptionStatus(
-                    `Result: description cleaned (${text.length} chars). Review the draft below and accept or reject.`
-                );
-            } else {
-                clearDescriptionConfirm();
-                setDescriptionStatus(
-                    "Result: no description returned. The provider could not clean this description."
-                );
-            }
-        } catch (error) {
-            setDescriptionStatus(`Description clean failed: ${error.message}`);
-        } finally {
-            descriptionActions?.classList.remove("is-loading");
-            descriptionButton.disabled = false;
-        }
-        });
-    }
-
-    if (descriptionReject) {
-        descriptionReject.addEventListener("click", () => {
-            clearDescriptionConfirm();
-        });
-    }
-
-    if (descriptionAccept) {
-        descriptionAccept.addEventListener("click", async () => {
-            const bookId = descriptionButton?.getAttribute("data-book-id");
-            if (!bookId || !descriptionBox) return;
-            const text = descriptionBox.textContent || "";
-            if (!text) return;
-            descriptionAccept.disabled = true;
-            descriptionReject?.setAttribute("disabled", "");
-            setDescriptionStatus("Saving accepted description to the library...");
-            try {
-                const response = await fetch(`/books/${bookId}/description`, {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ description: text }),
-                });
-                if (!response.ok) {
-                    const detail = await readResponseDetail(response);
-                    throw new Error(detail || "Failed to save description.");
-                }
-                descriptionBox.textContent = text;
-                clearDescriptionConfirm(false);
-                setDescriptionStatus("Result: description saved.");
-                if (clearDescriptionButton) {
-                    clearDescriptionButton.disabled = false;
-                }
-            } catch (error) {
-                setDescriptionStatus(`Save failed: ${error.message}`);
-            } finally {
-                descriptionAccept.disabled = false;
-                descriptionReject?.removeAttribute("disabled");
-            }
-        });
-    }
-
     if (clearDescriptionButton) {
         clearDescriptionButton.addEventListener("click", async () => {
             const confirmClear = window.confirm(
@@ -241,7 +112,6 @@
                     throw new Error(detail || "Failed to clear description.");
                 }
                 descriptionBox.innerHTML = '<p class="note">No description yet.</p>';
-                clearDescriptionConfirm(false);
                 setDescriptionStatus("Result: description cleared.");
             } catch (error) {
                 setDescriptionStatus(`Clear failed: ${error.message}`);
