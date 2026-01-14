@@ -27,7 +27,6 @@ class MetadataSearchResult(BaseModel):
     published_year: str | None = None
     isbn10: str | None = None
     isbn13: str | None = None
-    maturity_rating: str | None = None
     categories: list[str] = []
     description: str | None = None
     source: str | None = None

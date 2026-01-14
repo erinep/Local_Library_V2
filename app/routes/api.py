@@ -80,9 +80,6 @@ def build_api_router(
             categories = volume.get("categories") if isinstance(volume, dict) else None
             if not isinstance(categories, list):
                 categories = []
-            maturity_rating = volume.get("maturityRating") if isinstance(volume, dict) else None
-            if not isinstance(maturity_rating, str):
-                maturity_rating = None
             isbn10 = None
             isbn13 = None
             identifiers = volume.get("industryIdentifiers") if isinstance(volume, dict) else None
@@ -109,7 +106,6 @@ def build_api_router(
                     published_year=published_year,
                     isbn10=isbn10,
                     isbn13=isbn13,
-                    maturity_rating=maturity_rating,
                     categories=[str(item) for item in categories],
                     description=description,
                     source="google_books",

@@ -183,6 +183,16 @@
                 const year = document.createElement("div");
                 year.className = "note";
                 year.textContent = result.published_year ? `Year: ${result.published_year}` : "Year: n/a";
+                const isbn = document.createElement("div");
+                isbn.className = "note";
+                const isbnParts = [];
+                if (result.isbn13) {
+                    isbnParts.push(`ISBN-13: ${result.isbn13}`);
+                }
+                if (result.isbn10) {
+                    isbnParts.push(`ISBN-10: ${result.isbn10}`);
+                }
+                isbn.textContent = isbnParts.length ? isbnParts.join(" | ") : "ISBN: n/a";
                 const categories = document.createElement("div");
                 categories.className = "note";
                 const categoryList = result.categories?.length ? result.categories : [];
@@ -210,6 +220,7 @@
                 info.appendChild(title);
                 info.appendChild(author);
                 info.appendChild(year);
+                info.appendChild(isbn);
                 info.appendChild(categories);
                 info.appendChild(desc);
 
