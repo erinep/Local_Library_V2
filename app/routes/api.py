@@ -8,10 +8,8 @@ from ..schemas import (
     BookDescriptionUpdate,
     MetadataApplyRequest,
     MetadataApplyResult,
-    MetadataCleanRequest,
-    MetadataCleanResult,
-    MetadataTagInferenceRequest,
-    MetadataTagInferenceResult,
+    MetadataAiCleanRequest,
+    MetadataAiCleanResult,
     MetadataPrepareRequest,
     MetadataPrepareResult,
     MetadataSearchRequest,
@@ -37,6 +35,7 @@ def build_api_router(
     get_or_create_tag,
     add_tags_to_book,
     remove_non_topic_tags_from_book,
+    get_inference_order,
 ) -> APIRouter:
     router = APIRouter()
 
@@ -174,24 +173,28 @@ def build_api_router(
                 description_updated = True
         return MetadataApplyResult(tags_added=added, description_updated=description_updated)
 
-    @router.post("/books/{book_id}/metadata/clean", response_model=MetadataCleanResult)
-    def metadata_clean(book_id: int, payload: MetadataCleanRequest) -> MetadataCleanResult:
-        """Clean description text using the metadata provider."""
+    @router.post("/books/{book_id}/metadata/ai_clean", response_model=MetadataAiCleanResult)
+    def metadata_ai_clean(
+        book_id: int,
+        payload: MetadataAiCleanRequest,
+    ) -> MetadataAiCleanResult:
+        """Run AI clean/tag inference in configured order."""
         title = payload.title or ""
         author = payload.author or ""
         description = payload.description or ""
-        cleaned = books_provider.clean_description(title=title, author=author, description=description)
-        return MetadataCleanResult(description=cleaned)
-
-    @router.post("/books/{book_id}/metadata/tag_inference", response_model=MetadataTagInferenceResult)
-    def metadata_tag_inference(
-        book_id: int,
-        payload: MetadataTagInferenceRequest,
-    ) -> MetadataTagInferenceResult:
-        """Infer tags from a description using the metadata provider."""
-        description = payload.description or ""
-        tags = books_provider.tag_inference(description)
-        return MetadataTagInferenceResult(tags=tags)
+        tags: list[str] = []
+        for step in get_inference_order():
+            if step == "description_clean":
+                cleaned = books_provider.clean_description(
+                    title=title,
+                    author=author,
+                    description=description,
+                )
+                if cleaned:
+                    description = cleaned
+            elif step == "tag_inference":
+                tags = books_provider.tag_inference(description)
+        return MetadataAiCleanResult(description=description or None, tags=tags)
 
     @router.post("/books/{book_id}/description", response_model=BookDescriptionResult)
     def save_description(book_id: int, payload: BookDescriptionUpdate) -> BookDescriptionResult:

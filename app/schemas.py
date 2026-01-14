@@ -54,21 +54,14 @@ class MetadataApplyRequest(BaseModel):
     description_rewritten: bool = False
 
 
-class MetadataCleanRequest(BaseModel):
+class MetadataAiCleanRequest(BaseModel):
     title: str | None = None
     author: str | None = None
     description: str | None = None
 
 
-class MetadataCleanResult(BaseModel):
+class MetadataAiCleanResult(BaseModel):
     description: str | None = None
-
-
-class MetadataTagInferenceRequest(BaseModel):
-    description: str | None = None
-
-
-class MetadataTagInferenceResult(BaseModel):
     tags: list[str]
 
 

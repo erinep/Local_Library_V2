@@ -134,8 +134,7 @@
         const metadataTags = metadataReviewModal.querySelector("[data-metadata-tags]");
         const metadataDescription = metadataReviewModal.querySelector("[data-metadata-description]");
         const metadataApply = metadataReviewModal.querySelector("[data-metadata-apply]");
-        const metadataClean = metadataReviewModal.querySelector("[data-metadata-clean]");
-        const metadataTagInference = metadataReviewModal.querySelector("[data-metadata-tag-inference]");
+        const metadataAiClean = metadataReviewModal.querySelector("[data-metadata-ai-clean]");
         const metadataDescWrap = metadataReviewModal.querySelector("[data-metadata-desc-wrap]");
         const metadataBack = metadataReviewModal.querySelector("[data-metadata-back]");
         const metadataCancel = metadataReviewModal.querySelector("[data-metadata-cancel]");
@@ -159,13 +158,9 @@
             rewrittenDescription = "";
             activeResult = null;
             activeSource = "google_books";
-            if (metadataClean) {
-                metadataClean.disabled = false;
-                metadataClean.removeAttribute("title");
-            }
-            if (metadataTagInference) {
-                metadataTagInference.disabled = false;
-                metadataTagInference.removeAttribute("title");
+            if (metadataAiClean) {
+                metadataAiClean.disabled = false;
+                metadataAiClean.removeAttribute("title");
             }
         };
 
@@ -361,11 +356,11 @@
             });
         }
 
-        if (metadataClean) {
-            metadataClean.addEventListener("click", async () => {
-                if (!metadataDescription || !activeBookId) return;
+        if (metadataAiClean) {
+            metadataAiClean.addEventListener("click", async () => {
+                if (!metadataDescription || !metadataTags || !activeBookId) return;
                 const raw = metadataDescription.value.trim() || originalDescription || "";
-                setMetadataStatus("Cleaning description...");
+                setMetadataStatus("Running AI cleanup...");
                 if (metadataDescWrap) {
                     metadataDescWrap.classList.add("is-loading");
                 }
@@ -375,9 +370,8 @@
                 if (metadataApply) {
                     metadataApply.disabled = true;
                 }
-                let cleaned = false;
                 try {
-                    const response = await fetch(`/books/${activeBookId}/metadata/clean`, {
+                    const response = await fetch(`/books/${activeBookId}/metadata/ai_clean`, {
                         method: "POST",
                         headers: { "Content-Type": "application/json" },
                         body: JSON.stringify({
@@ -387,65 +381,13 @@
                         }),
                     });
                     if (!response.ok) {
-                        throw new Error("Clean failed.");
+                        throw new Error("AI clean failed.");
                     }
                     const payload = await response.json();
                     if (payload.description) {
                         rewrittenDescription = payload.description;
-                        if (metadataDescription) {
-                            metadataDescription.value = payload.description;
-                        }
-                        cleaned = true;
+                        metadataDescription.value = payload.description;
                     }
-                    setMetadataStatus("Description cleaned.");
-                } catch (error) {
-                    setMetadataStatus("Unable to clean description.");
-                } finally {
-                    if (metadataDescWrap) {
-                        metadataDescWrap.classList.remove("is-loading");
-                    }
-                    if (metadataLoading) {
-                        metadataLoading.setAttribute("hidden", "");
-                    }
-                    if (metadataApply) {
-                        metadataApply.disabled = false;
-                    }
-                    if (metadataClean && cleaned) {
-                        metadataClean.disabled = true;
-                        metadataClean.setAttribute(
-                            "title",
-                            "Already cleaned this session. Reopen metadata to run again."
-                        );
-                    }
-                }
-            });
-        }
-
-        if (metadataTagInference) {
-            metadataTagInference.addEventListener("click", async () => {
-                if (!metadataTags || !metadataDescription || !activeBookId) return;
-                const raw = metadataDescription.value.trim() || originalDescription || "";
-                setMetadataStatus("Inferring tags...");
-                if (metadataDescWrap) {
-                    metadataDescWrap.classList.add("is-loading");
-                }
-                if (metadataLoading) {
-                    metadataLoading.removeAttribute("hidden");
-                }
-                if (metadataApply) {
-                    metadataApply.disabled = true;
-                }
-                let inferred = false;
-                try {
-                    const response = await fetch(`/books/${activeBookId}/metadata/tag_inference`, {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ description: raw }),
-                    });
-                    if (!response.ok) {
-                        throw new Error("Tag inference failed.");
-                    }
-                    const payload = await response.json();
                     const tags = Array.isArray(payload.tags) ? payload.tags : [];
                     if (tags.length) {
                         const existing = new Set(
@@ -468,11 +410,10 @@
                             pill.appendChild(text);
                             metadataTags.appendChild(pill);
                         });
-                        inferred = true;
                     }
-                    setMetadataStatus("Tags inferred.");
+                    setMetadataStatus("AI updates ready for review.");
                 } catch (error) {
-                    setMetadataStatus("Unable to infer tags.");
+                    setMetadataStatus("Unable to run AI cleanup.");
                 } finally {
                     if (metadataDescWrap) {
                         metadataDescWrap.classList.remove("is-loading");
@@ -482,13 +423,6 @@
                     }
                     if (metadataApply) {
                         metadataApply.disabled = false;
-                    }
-                    if (metadataTagInference && inferred) {
-                        metadataTagInference.disabled = true;
-                        metadataTagInference.setAttribute(
-                            "title",
-                            "Already inferred this session. Reopen metadata to run again."
-                        );
                     }
                 }
             });
@@ -545,13 +479,9 @@
             const originalOpen = window.ModalController.open?.bind(window.ModalController);
             if (originalOpen) {
                 window.ModalController.open = (modalId) => {
-                    if (modalId === "metadata-review" && metadataClean) {
-                        metadataClean.disabled = false;
-                        metadataClean.removeAttribute("title");
-                    }
-                    if (modalId === "metadata-review" && metadataTagInference) {
-                        metadataTagInference.disabled = false;
-                        metadataTagInference.removeAttribute("title");
+                    if (modalId === "metadata-review" && metadataAiClean) {
+                        metadataAiClean.disabled = false;
+                        metadataAiClean.removeAttribute("title");
                     }
                     return originalOpen(modalId);
                 };

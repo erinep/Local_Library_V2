@@ -1,5 +1,8 @@
 {
   "library_roots": [
+    "E:/Audio/audiobooks/_romance",
+    "E:/Audio/audiobooks/_FantasySciFiHistory",
+    "E:/Audio/audiobooks/_fiction",
     "E:/Audio/audiobooks/_nonfiction"
   ],
   "allowed_extensions": [
@@ -21,19 +24,19 @@
     },
     {
       "tag_prefix": "Reader",
-      "ui_label": "Reader"
+      "ui_label": "Market Placement"
     },
     {
       "tag_prefix": "Romance",
-      "ui_label": "Romance"
+      "ui_label": "Romance Weight"
     },
     {
       "tag_prefix": "Setting",
       "ui_label": "Setting"
-    },
-    {
-      "tag_prefix": "Commitment",
-      "ui_label": "Commitment"
     }
+  ],
+  "inference_order": [
+    "description_clean",
+    "tag_inference"
   ]
 }

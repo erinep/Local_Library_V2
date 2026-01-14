@@ -7,6 +7,7 @@ from fastapi.templating import Jinja2Templates
 from dotenv import load_dotenv
 
 from .config import (
+    get_inference_order,
     get_tag_namespace_config,
     get_tag_namespace_list,
     iter_files,
@@ -80,6 +81,7 @@ app.include_router(
         get_or_create_tag=get_or_create_tag,
         add_tags_to_book=add_tags_to_book,
         remove_non_topic_tags_from_book=remove_non_topic_tags_from_book,
+        get_inference_order=get_inference_order,
     )
 )
 app.include_router(

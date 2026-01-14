@@ -14,6 +14,7 @@ DEFAULT_TAG_NAMESPACE_CONFIG = [
     {"tag_prefix": "Setting", "ui_label": "Setting"},
     {"tag_prefix": "Commitment", "ui_label": "Commitment"},
 ]
+DEFAULT_INFERENCE_ORDER = ["description_clean", "tag_inference"]
 
 
 @dataclass(frozen=True)
@@ -66,6 +67,16 @@ def get_tag_namespace_list(
     if config is None:
         config = get_tag_namespace_config(path)
     return [entry["tag_prefix"] for entry in config]
+
+
+def get_inference_order(path: Path = CONFIG_PATH) -> list[str]:
+    raw = json.loads(path.read_text(encoding="utf-8"))
+    configured = raw.get("inference_order") or DEFAULT_INFERENCE_ORDER
+    if not isinstance(configured, list):
+        return list(DEFAULT_INFERENCE_ORDER)
+    allowed = {"description_clean", "tag_inference"}
+    cleaned = [str(entry).strip() for entry in configured if str(entry).strip() in allowed]
+    return cleaned or list(DEFAULT_INFERENCE_ORDER)
 
 
 def iter_files(roots: Iterable[Path], allowed_extensions: set[str], ignore_patterns: list[str]) -> Iterable[Path]:
