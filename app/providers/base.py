@@ -31,10 +31,10 @@ class MetadataProvider(Protocol):
         """Return tag candidates for a specific result id."""
         raise NotImplementedError
 
-    def get_description(self, title: str, author: str) -> str | None:
-        """Return a description for a title/author pair."""
+    def clean_description(self, title: str, author: str, description: str) -> str | None:
+        """Return a noramlized 1-3 sentance description."""
         raise NotImplementedError
 
-    def clean_description(self, title: str, author: str, description: str) -> str | None:
-        """Return a cleaned description for a title/author pair."""
+    def tag_inference(self, book_description: str) -> list[str]:
+        """Infer tags from a book description."""
         raise NotImplementedError

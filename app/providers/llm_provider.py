@@ -30,28 +30,11 @@ class LlmProvider:
         content = path.read_text(encoding="utf-8").strip()
         return content or None
 
-    def get_description(self, title: str, author: str) -> str | None:
-        """Request a short description from the configured LLM endpoint."""
+    def _require_config(self) -> None:
         if not self.base_url or not self.model:
             raise HTTPException(status_code=500, detail="LLM_BASE_URL or LLM_MODEL not configured.")
-        prompt_title = title.strip() or "Unknown title"
-        prompt_author = author.strip() or "Unknown author"
-        messages = []
-        system_prompt = self._load_system_prompt("get_description")
-        if system_prompt:
-            messages.append({"role": "system", "content": system_prompt})
-        messages.append(
-            {
-                "role": "user",
-                "content": f"Title: {prompt_title} | Author: {prompt_author}",
-            }
-        )
-        payload = {
-            "model": self.model,
-            "messages": messages,
-            "temperature": 0,
-            "max_tokens": 512,
-        }
+
+    def _post_chat(self, payload: dict[str, object]) -> dict[str, object]:
         url = f"{self.base_url.rstrip('/')}/v1/chat/completions"
         request = Request(
             url,
@@ -71,7 +54,12 @@ class LlmProvider:
             if isinstance(exc, URLError) and isinstance(exc.reason, socket.timeout):
                 raise HTTPException(status_code=504, detail="LLM request timed out.") from exc
             raise HTTPException(status_code=502, detail="LLM request failed.") from exc
-        choices = body.get("choices") if isinstance(body, dict) else None
+        if not isinstance(body, dict):
+            raise HTTPException(status_code=502, detail="LLM response malformed.")
+        return body
+
+    def _extract_content(self, body: dict[str, object], empty_detail: str) -> str:
+        choices = body.get("choices")
         if not isinstance(choices, list) or not choices:
             raise HTTPException(status_code=502, detail="LLM response missing choices.")
         choice = choices[0]
@@ -84,13 +72,12 @@ class LlmProvider:
             raise HTTPException(status_code=502, detail="LLM response content invalid.")
         cleaned = content.strip()
         if not cleaned:
-            raise HTTPException(status_code=502, detail="LLM returned empty description.")
+            raise HTTPException(status_code=502, detail=empty_detail)
         return cleaned
 
     def clean_description(self, title: str, author: str, description: str) -> str | None:
         """Request a cleaned description from the configured LLM endpoint."""
-        if not self.base_url or not self.model:
-            raise HTTPException(status_code=500, detail="LLM_BASE_URL or LLM_MODEL not configured.")
+        self._require_config()
         raw_title = title.strip() or "Unknown title"
         raw_author = author.strip() or "Unknown author"
         raw_description = description.strip() or "No description provided"
@@ -110,41 +97,44 @@ class LlmProvider:
             "temperature": 0,
             "max_tokens": 512,
         }
-        url = f"{self.base_url.rstrip('/')}/v1/chat/completions"
-        request = Request(
-            url,
-            data=json.dumps(payload).encode("utf-8"),
-            headers={
-                "Accept": "application/json",
-                "Content-Type": "application/json",
-            },
-            method="POST",
-        )
-        try:
-            with urlopen(request, timeout=self.timeout) as response:
-                body = json.loads(response.read().decode("utf-8"))
-        except socket.timeout as exc:
-            raise HTTPException(status_code=504, detail="LLM request timed out.") from exc
-        except (HTTPError, URLError, ValueError) as exc:
-            if isinstance(exc, URLError) and isinstance(exc.reason, socket.timeout):
-                raise HTTPException(status_code=504, detail="LLM request timed out.") from exc
-            raise HTTPException(status_code=502, detail="LLM request failed.") from exc
-        choices = body.get("choices") if isinstance(body, dict) else None
-        if not isinstance(choices, list) or not choices:
-            raise HTTPException(status_code=502, detail="LLM response missing choices.")
-        choice = choices[0]
-        if not isinstance(choice, dict):
-            raise HTTPException(status_code=502, detail="LLM response malformed.")
-        content = choice.get("content")
-        if content is None and isinstance(choice.get("message"), dict):
-            content = choice["message"].get("content")
-        if not isinstance(content, str):
-            raise HTTPException(status_code=502, detail="LLM response content invalid.")
-        cleaned = content.strip()
-        if not cleaned:
-            raise HTTPException(status_code=502, detail="LLM returned empty description.")
-        return cleaned
+        body = self._post_chat(payload)
+        return self._extract_content(body, "LLM returned empty description.")
 
-    def get_tags(self, result_id: str):
-        """Placeholder for LLM-backed tag generation."""
-        raise HTTPException(status_code=501, detail="LLM tag generation not implemented.")
+    def tag_inference(self, book_description: str) -> list[str]:
+        """Infer normalized tags from a book description via the LLM."""
+        self._require_config()
+        raw_description = book_description.strip() or "No description provided"
+        messages = []
+        system_prompt = self._load_system_prompt("tag_inference")
+        if system_prompt:
+            messages.append({"role": "system", "content": system_prompt})
+        messages.append({"role": "user", "content": raw_description})
+        payload = {
+            "model": self.model,
+            "messages": messages,
+            "temperature": 0,
+            "max_tokens": 512,
+        }
+        body = self._post_chat(payload)
+        cleaned = self._extract_content(body, "LLM returned empty tag JSON.")
+        try:
+            parsed = json.loads(cleaned)
+        except json.JSONDecodeError as exc:
+            raise HTTPException(status_code=502, detail="LLM tag JSON invalid.") from exc
+        if not isinstance(parsed, dict):
+            raise HTTPException(status_code=502, detail="LLM tag JSON must be an object.")
+        tags: list[str] = []
+        for key, value in parsed.items():
+            key_text = str(key).strip()
+            if not key_text:
+                continue
+            if isinstance(value, list):
+                for item in value:
+                    value_text = str(item).strip()
+                    if value_text:
+                        tags.append(f"{key_text}:{value_text}")
+                continue
+            value_text = str(value).strip()
+            if value_text:
+                tags.append(f"{key_text}:{value_text}")
+        return tags
