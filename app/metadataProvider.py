@@ -34,9 +34,6 @@ class CompositeMetadataProvider:
     def get_tags(self, result_id: str):
         return self._search_provider.get_tags(result_id)
 
-    def get_description(self, title: str, author: str):
-        return self._description_provider.get_description(title=title, author=author)
-
     def clean_description(self, title: str, author: str, description: str):
         return self._cleanup_provider.clean_description(
             title=title,
