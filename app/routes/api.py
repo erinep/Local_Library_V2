@@ -10,6 +10,8 @@ from ..schemas import (
     MetadataApplyResult,
     MetadataCleanRequest,
     MetadataCleanResult,
+    MetadataTagInferenceRequest,
+    MetadataTagInferenceResult,
     MetadataPrepareRequest,
     MetadataPrepareResult,
     MetadataSearchRequest,
@@ -34,6 +36,7 @@ def build_api_router(
     infer_book_id,
     get_or_create_tag,
     add_tags_to_book,
+    remove_non_topic_tags_from_book,
 ) -> APIRouter:
     router = APIRouter()
 
@@ -155,6 +158,7 @@ def build_api_router(
             book = fetch_book_detail(conn, book_id)
             if book is None:
                 raise HTTPException(status_code=404, detail="Book not found.")
+            remove_non_topic_tags_from_book(conn, book_id)
             tag_ids: list[int] = []
             for tag_text in payload.tags:
                 cleaned = " ".join(str(tag_text).split())
@@ -178,6 +182,16 @@ def build_api_router(
         description = payload.description or ""
         cleaned = books_provider.clean_description(title=title, author=author, description=description)
         return MetadataCleanResult(description=cleaned)
+
+    @router.post("/books/{book_id}/metadata/tag_inference", response_model=MetadataTagInferenceResult)
+    def metadata_tag_inference(
+        book_id: int,
+        payload: MetadataTagInferenceRequest,
+    ) -> MetadataTagInferenceResult:
+        """Infer tags from a description using the metadata provider."""
+        description = payload.description or ""
+        tags = books_provider.tag_inference(description)
+        return MetadataTagInferenceResult(tags=tags)
 
     @router.post("/books/{book_id}/description", response_model=BookDescriptionResult)
     def save_description(book_id: int, payload: BookDescriptionUpdate) -> BookDescriptionResult:

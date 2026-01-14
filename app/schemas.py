@@ -64,6 +64,14 @@ class MetadataCleanResult(BaseModel):
     description: str | None = None
 
 
+class MetadataTagInferenceRequest(BaseModel):
+    description: str | None = None
+
+
+class MetadataTagInferenceResult(BaseModel):
+    tags: list[str]
+
+
 class MetadataApplyResult(BaseModel):
     tags_added: int
     description_updated: bool

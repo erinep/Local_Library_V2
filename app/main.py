@@ -23,6 +23,7 @@ from .db import (
     get_or_create_book,
     get_or_create_tag,
     init_db,
+    remove_non_topic_tags_from_book,
     remove_tag_from_book,
     upsert_files,
 )
@@ -78,6 +79,7 @@ app.include_router(
         ),
         get_or_create_tag=get_or_create_tag,
         add_tags_to_book=add_tags_to_book,
+        remove_non_topic_tags_from_book=remove_non_topic_tags_from_book,
     )
 )
 app.include_router(

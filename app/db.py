@@ -207,6 +207,26 @@ def remove_tag_from_book(conn: sqlite3.Connection, book_id: int, tag_id: int) ->
     return cur.rowcount
 
 
+def remove_non_topic_tags_from_book(conn: sqlite3.Connection, book_id: int) -> int:
+    """Remove all tags for a book except those starting with 'topics:'."""
+    cur = conn.cursor()
+    cur.execute(
+        """
+        DELETE FROM book_tags
+        WHERE book_id = ?
+          AND tag_id IN (
+              SELECT id
+              FROM tags
+              WHERE name NOT LIKE 'topics:%'
+          )
+        """,
+        (book_id,),
+    )
+    removed = cur.rowcount
+    conn.commit()
+    return removed
+
+
 def clean_unused_tags(conn: sqlite3.Connection) -> int:
     cur = conn.cursor()
     cur.execute(

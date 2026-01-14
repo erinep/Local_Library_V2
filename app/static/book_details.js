@@ -135,6 +135,7 @@
         const metadataDescription = metadataReviewModal.querySelector("[data-metadata-description]");
         const metadataApply = metadataReviewModal.querySelector("[data-metadata-apply]");
         const metadataClean = metadataReviewModal.querySelector("[data-metadata-clean]");
+        const metadataTagInference = metadataReviewModal.querySelector("[data-metadata-tag-inference]");
         const metadataDescWrap = metadataReviewModal.querySelector("[data-metadata-desc-wrap]");
         const metadataBack = metadataReviewModal.querySelector("[data-metadata-back]");
         const metadataCancel = metadataReviewModal.querySelector("[data-metadata-cancel]");
@@ -161,6 +162,10 @@
             if (metadataClean) {
                 metadataClean.disabled = false;
                 metadataClean.removeAttribute("title");
+            }
+            if (metadataTagInference) {
+                metadataTagInference.disabled = false;
+                metadataTagInference.removeAttribute("title");
             }
         };
 
@@ -416,6 +421,79 @@
             });
         }
 
+        if (metadataTagInference) {
+            metadataTagInference.addEventListener("click", async () => {
+                if (!metadataTags || !metadataDescription || !activeBookId) return;
+                const raw = metadataDescription.value.trim() || originalDescription || "";
+                setMetadataStatus("Inferring tags...");
+                if (metadataDescWrap) {
+                    metadataDescWrap.classList.add("is-loading");
+                }
+                if (metadataLoading) {
+                    metadataLoading.removeAttribute("hidden");
+                }
+                if (metadataApply) {
+                    metadataApply.disabled = true;
+                }
+                let inferred = false;
+                try {
+                    const response = await fetch(`/books/${activeBookId}/metadata/tag_inference`, {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ description: raw }),
+                    });
+                    if (!response.ok) {
+                        throw new Error("Tag inference failed.");
+                    }
+                    const payload = await response.json();
+                    const tags = Array.isArray(payload.tags) ? payload.tags : [];
+                    if (tags.length) {
+                        const existing = new Set(
+                            Array.from(metadataTags.querySelectorAll("input[type='checkbox']"))
+                                .map((input) => input.value)
+                        );
+                        tags.forEach((tag) => {
+                            const cleaned = String(tag).trim();
+                            if (!cleaned || existing.has(cleaned)) return;
+                            existing.add(cleaned);
+                            const pill = document.createElement("label");
+                            pill.className = "tag-pill tag-pill-proposed";
+                            const checkbox = document.createElement("input");
+                            checkbox.type = "checkbox";
+                            checkbox.checked = true;
+                            checkbox.value = cleaned;
+                            const text = document.createElement("span");
+                            text.textContent = cleaned;
+                            pill.appendChild(checkbox);
+                            pill.appendChild(text);
+                            metadataTags.appendChild(pill);
+                        });
+                        inferred = true;
+                    }
+                    setMetadataStatus("Tags inferred.");
+                } catch (error) {
+                    setMetadataStatus("Unable to infer tags.");
+                } finally {
+                    if (metadataDescWrap) {
+                        metadataDescWrap.classList.remove("is-loading");
+                    }
+                    if (metadataLoading) {
+                        metadataLoading.setAttribute("hidden", "");
+                    }
+                    if (metadataApply) {
+                        metadataApply.disabled = false;
+                    }
+                    if (metadataTagInference && inferred) {
+                        metadataTagInference.disabled = true;
+                        metadataTagInference.setAttribute(
+                            "title",
+                            "Already inferred this session. Reopen metadata to run again."
+                        );
+                    }
+                }
+            });
+        }
+
         if (metadataBack) {
             metadataBack.addEventListener("click", () => {
                 if (window.ModalController) {
@@ -470,6 +548,10 @@
                     if (modalId === "metadata-review" && metadataClean) {
                         metadataClean.disabled = false;
                         metadataClean.removeAttribute("title");
+                    }
+                    if (modalId === "metadata-review" && metadataTagInference) {
+                        metadataTagInference.disabled = false;
+                        metadataTagInference.removeAttribute("title");
                     }
                     return originalOpen(modalId);
                 };
