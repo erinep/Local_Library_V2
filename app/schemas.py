@@ -60,9 +60,15 @@ class MetadataAiCleanRequest(BaseModel):
     description: str | None = None
 
 
+class MetadataAiStep(BaseModel):
+    action: str
+    reasoning: str | None = None
+
+
 class MetadataAiCleanResult(BaseModel):
     description: str | None = None
     tags: list[str]
+    steps: list[MetadataAiStep]
 
 
 class MetadataApplyResult(BaseModel):

@@ -41,9 +41,9 @@ Allowed values:
 Romance
 Return a decimal number between 0.0 and 1.0. Determine the score by adding the following signals:
 +0.3 if a romantic relationship is implied or developing
-+0.3 if the story centres on two characters and their bond 
++0.2 if the story centres on two characters and their bond 
 +0.2 if emotional change or character growth is driven by romantic feelings or attraction
-+0.2 if the description explicitly frames the relationship as love, romance, or a romantic awakening
++0.3 if the description contains any romance genre conventions
 
 Reader
 Indicate how the book is written for its audience.

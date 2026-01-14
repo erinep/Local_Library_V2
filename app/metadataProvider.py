@@ -44,6 +44,25 @@ class CompositeMetadataProvider:
     def tag_inference(self, book_description: str):
         return self._tag_inference_provider.tag_inference(book_description)
 
+    def clean_description_with_reasoning(
+        self,
+        title: str,
+        author: str,
+        description: str,
+    ) -> tuple[str | None, str | None]:
+        if hasattr(self._cleanup_provider, "clean_description_with_reasoning"):
+            return self._cleanup_provider.clean_description_with_reasoning(
+                title=title,
+                author=author,
+                description=description,
+            )
+        return self.clean_description(title=title, author=author, description=description), None
+
+    def tag_inference_with_reasoning(self, book_description: str) -> tuple[list[str], str | None]:
+        if hasattr(self._tag_inference_provider, "tag_inference_with_reasoning"):
+            return self._tag_inference_provider.tag_inference_with_reasoning(book_description)
+        return self.tag_inference(book_description), None
+
 
 def get_default_provider() -> MetadataProvider:
     """Return the default metadata provider used by app/main.py."""

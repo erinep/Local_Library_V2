@@ -139,6 +139,9 @@
         const metadataBack = metadataReviewModal.querySelector("[data-metadata-back]");
         const metadataCancel = metadataReviewModal.querySelector("[data-metadata-cancel]");
         const metadataLoading = metadataReviewModal.querySelector("[data-metadata-loading]");
+        const metadataAiLog = metadataReviewModal.querySelector("[data-metadata-ai-log]");
+        const metadataAiContinue = metadataReviewModal.querySelector("[data-metadata-ai-continue]");
+        const metadataAiSpinner = metadataReviewModal.querySelector("[data-metadata-ai-spinner]");
         let activeResult = null;
         let originalDescription = "";
         let rewrittenDescription = "";
@@ -162,7 +165,37 @@
                 metadataAiClean.disabled = false;
                 metadataAiClean.removeAttribute("title");
             }
+            if (metadataAiLog) {
+                metadataAiLog.innerHTML = "";
+            }
+            if (metadataAiContinue) {
+                metadataAiContinue.setAttribute("hidden", "");
+            }
         };
+
+        const closeAiLoading = () => {
+            if (metadataDescWrap) {
+                metadataDescWrap.classList.remove("is-loading");
+            }
+            if (metadataLoading) {
+                metadataLoading.setAttribute("hidden", "");
+            }
+            if (metadataApply) {
+                metadataApply.disabled = false;
+            }
+            if (metadataAiClean) {
+                metadataAiClean.disabled = false;
+            }
+            if (metadataAiSpinner) {
+                metadataAiSpinner.removeAttribute("hidden");
+            }
+        };
+
+        if (metadataAiContinue) {
+            metadataAiContinue.addEventListener("click", () => {
+                closeAiLoading();
+            });
+        }
 
         const renderResults = (results) => {
             if (!metadataResults) return;
@@ -359,6 +392,47 @@
         if (metadataAiClean) {
             metadataAiClean.addEventListener("click", async () => {
                 if (!metadataDescription || !metadataTags || !activeBookId) return;
+                const appendLogEntry = (desc) => {
+                    if (!metadataAiLog) return;
+                    const entry = document.createElement("div");
+                    entry.className = "metadata-ai-log-line";
+                    const typeSpan = document.createElement("span");
+                    typeSpan.className = "metadata-ai-log-type";
+                    typeSpan.textContent = "INFO:";
+                    const sepSpan = document.createElement("span");
+                    sepSpan.textContent = " ";
+                    const descSpan = document.createElement("span");
+                    descSpan.className = "metadata-ai-log-desc";
+                    descSpan.textContent = desc;
+                    entry.appendChild(typeSpan);
+                    entry.appendChild(sepSpan);
+                    entry.appendChild(descSpan);
+                    metadataAiLog.appendChild(entry);
+                };
+                const applyTags = (tags) => {
+                    const list = Array.isArray(tags) ? tags : [];
+                    if (!list.length) return;
+                    const existing = new Set(
+                        Array.from(metadataTags.querySelectorAll("input[type='checkbox']"))
+                            .map((input) => input.value)
+                    );
+                    list.forEach((tag) => {
+                        const cleaned = String(tag).trim();
+                        if (!cleaned || existing.has(cleaned)) return;
+                        existing.add(cleaned);
+                        const pill = document.createElement("label");
+                        pill.className = "tag-pill tag-pill-proposed";
+                        const checkbox = document.createElement("input");
+                        checkbox.type = "checkbox";
+                        checkbox.checked = true;
+                        checkbox.value = cleaned;
+                        const text = document.createElement("span");
+                        text.textContent = cleaned;
+                        pill.appendChild(checkbox);
+                        pill.appendChild(text);
+                        metadataTags.appendChild(pill);
+                    });
+                };
                 const raw = metadataDescription.value.trim() || originalDescription || "";
                 setMetadataStatus("Running AI cleanup...");
                 if (metadataDescWrap) {
@@ -367,11 +441,21 @@
                 if (metadataLoading) {
                     metadataLoading.removeAttribute("hidden");
                 }
+                if (metadataAiLog) {
+                    metadataAiLog.innerHTML = "";
+                }
+                if (metadataAiContinue) {
+                    metadataAiContinue.setAttribute("hidden", "");
+                }
                 if (metadataApply) {
                     metadataApply.disabled = true;
                 }
+                metadataAiClean.disabled = true;
+                if (metadataAiSpinner) {
+                    metadataAiSpinner.removeAttribute("hidden");
+                }
                 try {
-                    const response = await fetch(`/books/${activeBookId}/metadata/ai_clean`, {
+                    const response = await fetch(`/books/${activeBookId}/metadata/ai_clean/stream`, {
                         method: "POST",
                         headers: { "Content-Type": "application/json" },
                         body: JSON.stringify({
@@ -383,46 +467,92 @@
                     if (!response.ok) {
                         throw new Error("AI clean failed.");
                     }
-                    const payload = await response.json();
-                    if (payload.description) {
-                        rewrittenDescription = payload.description;
-                        metadataDescription.value = payload.description;
+                    const reader = response.body?.getReader();
+                    if (!reader) {
+                        const fallbackText = await response.text();
+                        if (fallbackText) {
+                            appendLogEntry(fallbackText);
+                        }
+                        setMetadataStatus("AI updates ready for review.");
+                        if (metadataAiSpinner) {
+                            metadataAiSpinner.setAttribute("hidden", "");
+                        }
+                        if (metadataAiContinue) {
+                            metadataAiContinue.removeAttribute("hidden");
+                        }
+                        return;
                     }
-                    const tags = Array.isArray(payload.tags) ? payload.tags : [];
-                    if (tags.length) {
-                        const existing = new Set(
-                            Array.from(metadataTags.querySelectorAll("input[type='checkbox']"))
-                                .map((input) => input.value)
-                        );
-                        tags.forEach((tag) => {
-                            const cleaned = String(tag).trim();
-                            if (!cleaned || existing.has(cleaned)) return;
-                            existing.add(cleaned);
-                            const pill = document.createElement("label");
-                            pill.className = "tag-pill tag-pill-proposed";
-                            const checkbox = document.createElement("input");
-                            checkbox.type = "checkbox";
-                            checkbox.checked = true;
-                            checkbox.value = cleaned;
-                            const text = document.createElement("span");
-                            text.textContent = cleaned;
-                            pill.appendChild(checkbox);
-                            pill.appendChild(text);
-                            metadataTags.appendChild(pill);
+                    const decoder = new TextDecoder();
+                    let buffer = "";
+                    const handleEventBlock = (block) => {
+                        const lines = block.split("\n").filter((line) => line.trim().length > 0);
+                        let eventName = "message";
+                        const dataLines = [];
+                        lines.forEach((line) => {
+                            if (line.startsWith("event:")) {
+                                eventName = line.slice(6).trim();
+                                return;
+                            }
+                            if (line.startsWith("data:")) {
+                                dataLines.push(line.slice(5).trimStart());
+                            }
                         });
+                        const payloadText = dataLines.join("\n").trim();
+                        let payload = {};
+                        if (payloadText) {
+                            try {
+                                payload = JSON.parse(payloadText);
+                            } catch (error) {
+                                appendLogEntry("Malformed event payload.");
+                            }
+                        }
+                        appendLogEntry(eventName);
+                        if (payload.action) {
+                            appendLogEntry(String(payload.action));
+                        }
+                        if (payload.reasoning) {
+                            appendLogEntry(String(payload.reasoning));
+                        }
+                        if (payload.description) {
+                            rewrittenDescription = String(payload.description);
+                            metadataDescription.value = rewrittenDescription;
+                        }
+                        if (payload.tags) {
+                            applyTags(payload.tags);
+                        }
+                        if (eventName === "done") {
+                            setMetadataStatus("AI updates ready for review.");
+                            if (metadataAiSpinner) {
+                                metadataAiSpinner.setAttribute("hidden", "");
+                            }
+                        }
+                    };
+                    while (true) {
+                        const { value, done } = await reader.read();
+                        if (done) break;
+                        buffer += decoder.decode(value, { stream: true });
+                        buffer = buffer.replace(/\r/g, "");
+                        const parts = buffer.split("\n\n");
+                        buffer = parts.pop() || "";
+                        parts.forEach(handleEventBlock);
                     }
-                    setMetadataStatus("AI updates ready for review.");
+                    if (buffer.trim()) {
+                        handleEventBlock(buffer);
+                    }
                 } catch (error) {
                     setMetadataStatus("Unable to run AI cleanup.");
+                    if (metadataAiLog) {
+                        const entry = document.createElement("div");
+                        entry.className = "note";
+                        entry.textContent = "AI request failed.";
+                        metadataAiLog.appendChild(entry);
+                    }
+                    if (metadataAiSpinner) {
+                        metadataAiSpinner.setAttribute("hidden", "");
+                    }
                 } finally {
-                    if (metadataDescWrap) {
-                        metadataDescWrap.classList.remove("is-loading");
-                    }
-                    if (metadataLoading) {
-                        metadataLoading.setAttribute("hidden", "");
-                    }
-                    if (metadataApply) {
-                        metadataApply.disabled = false;
+                    if (metadataAiContinue) {
+                        metadataAiContinue.removeAttribute("hidden");
                     }
                 }
             });

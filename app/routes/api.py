@@ -1,7 +1,10 @@
 from __future__ import annotations
 
 from datetime import datetime
+import json
+
 from fastapi import APIRouter, HTTPException
+from fastapi.responses import StreamingResponse
 
 from ..schemas import (
     BookDescriptionResult,
@@ -10,6 +13,7 @@ from ..schemas import (
     MetadataApplyResult,
     MetadataAiCleanRequest,
     MetadataAiCleanResult,
+    MetadataAiStep,
     MetadataPrepareRequest,
     MetadataPrepareResult,
     MetadataSearchRequest,
@@ -183,18 +187,107 @@ def build_api_router(
         author = payload.author or ""
         description = payload.description or ""
         tags: list[str] = []
+        steps: list[MetadataAiStep] = []
         for step in get_inference_order():
             if step == "description_clean":
-                cleaned = books_provider.clean_description(
-                    title=title,
-                    author=author,
-                    description=description,
-                )
+                if hasattr(books_provider, "clean_description_with_reasoning"):
+                    cleaned, reasoning = books_provider.clean_description_with_reasoning(
+                        title=title,
+                        author=author,
+                        description=description,
+                    )
+                else:
+                    cleaned = books_provider.clean_description(
+                        title=title,
+                        author=author,
+                        description=description,
+                    )
+                    reasoning = None
                 if cleaned:
                     description = cleaned
+                steps.append(MetadataAiStep(action="description_clean", reasoning=reasoning))
             elif step == "tag_inference":
-                tags = books_provider.tag_inference(description)
-        return MetadataAiCleanResult(description=description or None, tags=tags)
+                if hasattr(books_provider, "tag_inference_with_reasoning"):
+                    tags, reasoning = books_provider.tag_inference_with_reasoning(description)
+                else:
+                    tags = books_provider.tag_inference(description)
+                    reasoning = None
+                steps.append(MetadataAiStep(action="tag_inference", reasoning=reasoning))
+        return MetadataAiCleanResult(description=description or None, tags=tags, steps=steps)
+
+    @router.post("/books/{book_id}/metadata/ai_clean/stream")
+    def metadata_ai_clean_stream(
+        book_id: int,
+        payload: MetadataAiCleanRequest,
+    ) -> StreamingResponse:
+        """Stream AI clean/tag inference steps in configured order."""
+        title = payload.title or ""
+        author = payload.author or ""
+        description = payload.description or ""
+
+        def _send_event(event: str, data: dict[str, object]) -> bytes:
+            payload_text = json.dumps(data, ensure_ascii=True)
+            return f"event: {event}\ndata: {payload_text}\n\n".encode("utf-8")
+
+        def _generate():
+            nonlocal description
+            try:
+                for step in get_inference_order():
+                    if step == "description_clean":
+                        yield _send_event("step_start", {"action": "description_clean"})
+                        if hasattr(books_provider, "clean_description_with_reasoning"):
+                            cleaned, reasoning = books_provider.clean_description_with_reasoning(
+                                title=title,
+                                author=author,
+                                description=description,
+                            )
+                        else:
+                            cleaned = books_provider.clean_description(
+                                title=title,
+                                author=author,
+                                description=description,
+                            )
+                            reasoning = None
+                        if cleaned:
+                            description = cleaned
+                        yield _send_event(
+                            "step_result",
+                            {
+                                "action": "description_clean",
+                                "description": description,
+                                "reasoning": reasoning,
+                            },
+                        )
+                    elif step == "tag_inference":
+                        yield _send_event("step_start", {"action": "tag_inference"})
+                        if hasattr(books_provider, "tag_inference_with_reasoning"):
+                            tags, reasoning = books_provider.tag_inference_with_reasoning(description)
+                        else:
+                            tags = books_provider.tag_inference(description)
+                            reasoning = None
+                        yield _send_event(
+                            "step_result",
+                            {
+                                "action": "tag_inference",
+                                "tags": tags,
+                                "reasoning": reasoning,
+                            },
+                        )
+                yield _send_event("done", {"status": "ok"})
+            except HTTPException as exc:
+                yield _send_event(
+                    "error",
+                    {"status": exc.status_code, "detail": str(exc.detail)},
+                )
+            except Exception as exc:  # pragma: no cover - defensive for streaming
+                yield _send_event("error", {"status": 500, "detail": str(exc)})
+
+        headers = {
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        }
+        return StreamingResponse(_generate(), media_type="text/event-stream", headers=headers)
 
     @router.post("/books/{book_id}/description", response_model=BookDescriptionResult)
     def save_description(book_id: int, payload: BookDescriptionUpdate) -> BookDescriptionResult:

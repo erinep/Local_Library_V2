@@ -147,8 +147,10 @@
     <div class="metadata-review" data-metadata-review>
       <div class="metadata-loading" data-metadata-loading hidden>
         <div class="metadata-loading-panel">
-          <div class="spinner" aria-hidden="true"></div>
-          <p class="note">Processing metadata. Please wait…</p>
+          <div class="spinner" data-metadata-ai-spinner aria-hidden="true"></div>
+          <p class="note">Processing metadata. Please wait...</p>
+          <div class="metadata-loading-log" data-metadata-ai-log></div>
+          <button class="btn btn-small" type="button" data-metadata-ai-continue hidden>Continue</button>
         </div>
       </div>
       <p class="note">Tags</p>

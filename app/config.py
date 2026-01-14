@@ -71,7 +71,7 @@ def get_tag_namespace_list(
 
 def get_inference_order(path: Path = CONFIG_PATH) -> list[str]:
     raw = json.loads(path.read_text(encoding="utf-8"))
-    configured = raw.get("inference_order") or DEFAULT_INFERENCE_ORDER
+    configured = raw.get("inference_order") or raw.get("Inference Order") or DEFAULT_INFERENCE_ORDER
     if not isinstance(configured, list):
         return list(DEFAULT_INFERENCE_ORDER)
     allowed = {"description_clean", "tag_inference"}

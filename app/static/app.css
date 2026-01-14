@@ -460,6 +460,32 @@ nav a:hover {
   box-shadow: 0 18px 36px var(--shadow);
 }
 
+.metadata-loading-log {
+  width: min(520px, 80vw);
+  max-height: 220px;
+  overflow: auto;
+  display: grid;
+  gap: 6px;
+  padding: 6px 0;
+}
+
+.metadata-ai-log-line {
+  font-size: 0.85rem;
+  line-height: 1.35;
+  color: var(--muted);
+}
+
+.metadata-ai-log-type {
+  color: var(--accent);
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.metadata-ai-log-desc {
+  white-space: pre-wrap;
+}
+
 .spinner {
   width: 28px;
   height: 28px;
