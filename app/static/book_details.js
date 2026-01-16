@@ -520,6 +520,13 @@
                         if (payload.tags) {
                             applyTags(payload.tags);
                         }
+                        if (eventName === "error" && payload.detail) {
+                            appendLogEntry(String(payload.detail));
+                            setMetadataStatus("AI cleanup failed.");
+                            if (metadataAiSpinner) {
+                                metadataAiSpinner.setAttribute("hidden", "");
+                            }
+                        }
                         if (eventName === "done") {
                             setMetadataStatus("AI updates ready for review.");
                             if (metadataAiSpinner) {
