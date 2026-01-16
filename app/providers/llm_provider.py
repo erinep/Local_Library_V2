@@ -9,6 +9,8 @@ from urllib.request import Request, urlopen
 
 from fastapi import HTTPException
 
+Message = dict[str, object]
+
 class LlmProvider:
     """LLM-backed metadata generator using a chat completions API."""
 
@@ -16,12 +18,28 @@ class LlmProvider:
         self,
         base_url: str | None = None,
         model: str | None = None,
-        timeout: float = 60.0,
+        timeout: float = 5.0,
     ) -> None:
         self.base_url = (base_url or os.getenv("LLM_BASE_URL") or "").strip()
         self.model = (model or os.getenv("LLM_MODEL") or "").strip()
         self.timeout = timeout
         self._prompt_dir = Path(__file__).resolve().parent / "prompts"
+
+    def _build_messages(self, system_prompt_name: str, user_content: str) -> list[Message]:
+        messages: list[Message] = []
+        system_prompt = self._load_system_prompt(system_prompt_name)
+        if system_prompt:
+            messages.append({"role": "system", "content": system_prompt})
+        messages.append({"role": "user", "content": user_content})
+        return messages
+
+    def _chat_payload(self, messages: list[Message]) -> dict[str, object]:
+        return {
+            "model": self.model,
+            "messages": messages,
+            "temperature": 0,
+            "max_tokens": 512,
+        }
 
     def _load_system_prompt(self, name: str) -> str | None:
         path = self._prompt_dir / f"{name}.txt"
@@ -67,6 +85,14 @@ class LlmProvider:
             raise HTTPException(status_code=502, detail="LLM response malformed.")
         return choice
 
+    def _choice_content(self, choice: dict[str, object]) -> object | None:
+        if "content" in choice:
+            return choice.get("content")
+        message = choice.get("message")
+        if isinstance(message, dict):
+            return message.get("content")
+        return None
+
     def _extract_reasoning(self, choice: dict[str, object]) -> str | None:
         reasoning = choice.get("reasoning")
         if isinstance(reasoning, str) and reasoning.strip():
@@ -92,9 +118,7 @@ class LlmProvider:
 
     def _extract_content(self, body: dict[str, object], empty_detail: str) -> str:
         choice = self._extract_choice(body)
-        content = choice.get("content")
-        if content is None and isinstance(choice.get("message"), dict):
-            content = choice["message"].get("content")
+        content = self._choice_content(choice)
         if not isinstance(content, str):
             raise HTTPException(status_code=502, detail="LLM response content invalid.")
         cleaned = content.strip()
@@ -108,9 +132,7 @@ class LlmProvider:
         empty_detail: str,
     ) -> tuple[str, str | None]:
         choice = self._extract_choice(body)
-        content = choice.get("content")
-        if content is None and isinstance(choice.get("message"), dict):
-            content = choice["message"].get("content")
+        content = self._choice_content(choice)
         if not isinstance(content, str):
             raise HTTPException(status_code=502, detail="LLM response content invalid.")
         cleaned = content.strip()
@@ -141,98 +163,40 @@ class LlmProvider:
                 tags.append(f"{key_text}:{value_text}")
         return tags
 
-    def clean_description(self, title: str, author: str, description: str) -> str | None:
-        """Request a cleaned description from the configured LLM endpoint."""
-        self._require_config()
-        raw_title = title.strip() or "Unknown title"
-        raw_author = author.strip() or "Unknown author"
-        raw_description = description.strip() or "No description provided"
-        messages = []
-        system_prompt = self._load_system_prompt("clean_description")
-        if system_prompt:
-            messages.append({"role": "system", "content": system_prompt})
-        messages.append(
-            {
-                "role": "user",
-                "content": f"{raw_title} | author: {raw_author} | description: {raw_description}",
-            }
-        )
-        payload = {
-            "model": self.model,
-            "messages": messages,
-            "temperature": 0,
-            "max_tokens": 512,
-        }
-        body = self._post_chat(payload)
-        return self._extract_content(body, "LLM returned empty description.")
-
-    def clean_description_with_reasoning(
+    def clean_description(
         self,
         title: str,
         author: str,
         description: str,
-    ) -> tuple[str | None, str | None]:
-        """Request a cleaned description and reasoning from the configured LLM endpoint."""
+        include_reasoning: bool = False,
+    ) -> tuple[str, str | None]:
+        """Request a cleaned description (and optional reasoning) from the configured LLM endpoint."""
         self._require_config()
         raw_title = title.strip() or "Unknown title"
         raw_author = author.strip() or "Unknown author"
         raw_description = description.strip() or "No description provided"
-        messages = []
-        system_prompt = self._load_system_prompt("clean_description")
-        if system_prompt:
-            messages.append({"role": "system", "content": system_prompt})
-        messages.append(
-            {
-                "role": "user",
-                "content": f"{raw_title} | author: {raw_author} | description: {raw_description}",
-            }
-        )
-        payload = {
-            "model": self.model,
-            "messages": messages,
-            "temperature": 0,
-            "max_tokens": 512,
-        }
-        body = self._post_chat(payload)
-        return self._extract_content_with_reasoning(body, "LLM returned empty description.")
+        user_content = f"{raw_title} | author: {raw_author} | description: {raw_description}"
+        messages = self._build_messages("clean_description", user_content)
+        body = self._post_chat(self._chat_payload(messages))
+        if include_reasoning:
+            return self._extract_content_with_reasoning(body, "LLM returned empty description.")
+        return self._extract_content(body, "LLM returned empty description."), None
 
-    def tag_inference(self, book_description: str) -> list[str]:
-        """Infer normalized tags from a book description via the LLM."""
-        self._require_config()
-        raw_description = book_description.strip() or "No description provided"
-        messages = []
-        system_prompt = self._load_system_prompt("tag_inference")
-        if system_prompt:
-            messages.append({"role": "system", "content": system_prompt})
-        messages.append({"role": "user", "content": raw_description})
-        payload = {
-            "model": self.model,
-            "messages": messages,
-            "temperature": 0,
-            "max_tokens": 512,
-        }
-        body = self._post_chat(payload)
-        cleaned = self._extract_content(body, "LLM returned empty tag JSON.")
-        return self._parse_tag_json(cleaned)
-
-    def tag_inference_with_reasoning(
+    def tag_inference(
         self,
         book_description: str,
+        include_reasoning: bool = False,
     ) -> tuple[list[str], str | None]:
-        """Infer normalized tags and reasoning from a book description via the LLM."""
+        """Infer normalized tags (and optional reasoning) from a book description via the LLM."""
         self._require_config()
         raw_description = book_description.strip() or "No description provided"
-        messages = []
-        system_prompt = self._load_system_prompt("tag_inference")
-        if system_prompt:
-            messages.append({"role": "system", "content": system_prompt})
-        messages.append({"role": "user", "content": raw_description})
-        payload = {
-            "model": self.model,
-            "messages": messages,
-            "temperature": 0,
-            "max_tokens": 512,
-        }
-        body = self._post_chat(payload)
-        cleaned, reasoning = self._extract_content_with_reasoning(body, "LLM returned empty tag JSON.")
-        return self._parse_tag_json(cleaned), reasoning
+        messages = self._build_messages("tag_inference", raw_description)
+        body = self._post_chat(self._chat_payload(messages))
+        if include_reasoning:
+            cleaned, reasoning = self._extract_content_with_reasoning(
+                body,
+                "LLM returned empty tag JSON.",
+            )
+            return self._parse_tag_json(cleaned), reasoning
+        cleaned = self._extract_content(body, "LLM returned empty tag JSON.")
+        return self._parse_tag_json(cleaned), None

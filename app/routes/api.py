@@ -190,28 +190,17 @@ def build_api_router(
         steps: list[MetadataAiStep] = []
         for step in get_inference_order():
             if step == "description_clean":
-                if hasattr(books_provider, "clean_description_with_reasoning"):
-                    cleaned, reasoning = books_provider.clean_description_with_reasoning(
-                        title=title,
-                        author=author,
-                        description=description,
-                    )
-                else:
-                    cleaned = books_provider.clean_description(
-                        title=title,
-                        author=author,
-                        description=description,
-                    )
-                    reasoning = None
+                cleaned, reasoning = books_provider.clean_description(
+                    title=title,
+                    author=author,
+                    description=description,
+                    include_reasoning=True,
+                )
                 if cleaned:
                     description = cleaned
                 steps.append(MetadataAiStep(action="description_clean", reasoning=reasoning))
             elif step == "tag_inference":
-                if hasattr(books_provider, "tag_inference_with_reasoning"):
-                    tags, reasoning = books_provider.tag_inference_with_reasoning(description)
-                else:
-                    tags = books_provider.tag_inference(description)
-                    reasoning = None
+                tags, reasoning = books_provider.tag_inference(description, include_reasoning=True)
                 steps.append(MetadataAiStep(action="tag_inference", reasoning=reasoning))
         return MetadataAiCleanResult(description=description or None, tags=tags, steps=steps)
 
@@ -232,22 +221,16 @@ def build_api_router(
         def _generate():
             nonlocal description
             try:
+                yield _send_event("ping", {"status": "started"})
                 for step in get_inference_order():
                     if step == "description_clean":
                         yield _send_event("step_start", {"action": "description_clean"})
-                        if hasattr(books_provider, "clean_description_with_reasoning"):
-                            cleaned, reasoning = books_provider.clean_description_with_reasoning(
-                                title=title,
-                                author=author,
-                                description=description,
-                            )
-                        else:
-                            cleaned = books_provider.clean_description(
-                                title=title,
-                                author=author,
-                                description=description,
-                            )
-                            reasoning = None
+                        cleaned, reasoning = books_provider.clean_description(
+                            title=title,
+                            author=author,
+                            description=description,
+                            include_reasoning=True,
+                        )
                         if cleaned:
                             description = cleaned
                         yield _send_event(
@@ -260,11 +243,7 @@ def build_api_router(
                         )
                     elif step == "tag_inference":
                         yield _send_event("step_start", {"action": "tag_inference"})
-                        if hasattr(books_provider, "tag_inference_with_reasoning"):
-                            tags, reasoning = books_provider.tag_inference_with_reasoning(description)
-                        else:
-                            tags = books_provider.tag_inference(description)
-                            reasoning = None
+                        tags, reasoning = books_provider.tag_inference(description, include_reasoning=True)
                         yield _send_event(
                             "step_result",
                             {
