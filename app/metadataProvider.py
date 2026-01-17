@@ -26,14 +26,10 @@ class DefaultMetadataProvider:
 
     def clean_description(
         self,
-        title: str,
-        author: str,
         description: str,
         include_reasoning: bool = False,
     ):
         return self._llm_provider.clean_description(
-            title=title,
-            author=author,
             description=description,
             include_reasoning=include_reasoning,
         )

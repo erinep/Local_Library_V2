@@ -33,8 +33,6 @@ class MetadataProvider(Protocol):
 
     def clean_description(
         self,
-        title: str,
-        author: str,
         description: str,
         include_reasoning: bool = False,
     ) -> tuple[str, str | None]:

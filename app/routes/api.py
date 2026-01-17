@@ -191,8 +191,6 @@ def build_api_router(
         for step in get_inference_order():
             if step == "description_clean":
                 cleaned, reasoning = books_provider.clean_description(
-                    title=title,
-                    author=author,
                     description=description,
                     include_reasoning=True,
                 )
@@ -226,8 +224,6 @@ def build_api_router(
                     if step == "description_clean":
                         yield _send_event("step_start", {"action": "description_clean"})
                         cleaned, reasoning = books_provider.clean_description(
-                            title=title,
-                            author=author,
                             description=description,
                             include_reasoning=True,
                         )

@@ -18,7 +18,7 @@ class LlmProvider:
         self,
         base_url: str | None = None,
         model: str | None = None,
-        timeout: float = 5.0,
+        timeout: float = 45.0,
     ) -> None:
         self.base_url = (base_url or os.getenv("LLM_BASE_URL") or "").strip()
         self.model = (model or os.getenv("LLM_MODEL") or "").strip()
@@ -165,18 +165,13 @@ class LlmProvider:
 
     def clean_description(
         self,
-        title: str,
-        author: str,
         description: str,
         include_reasoning: bool = False,
     ) -> tuple[str, str | None]:
         """Request a cleaned description (and optional reasoning) from the configured LLM endpoint."""
         self._require_config()
-        raw_title = title.strip() or "Unknown title"
-        raw_author = author.strip() or "Unknown author"
         raw_description = description.strip() or "No description provided"
-        user_content = f"{raw_title} | author: {raw_author} | description: {raw_description}"
-        messages = self._build_messages("clean_description", user_content)
+        messages = self._build_messages("clean_description", raw_description)
         body = self._post_chat(self._chat_payload(messages))
         if include_reasoning:
             return self._extract_content_with_reasoning(body, "LLM returned empty description.")
