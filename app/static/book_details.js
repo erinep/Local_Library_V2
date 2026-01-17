@@ -359,14 +359,13 @@
                         .map((input) => input.value)
                     : [];
                 const descriptionValue = metadataDescription?.value || "";
-                const hasDescription = descriptionValue.trim().length > 0;
-                const choice = hasDescription ? "include" : "none";
+                const rawDescription = originalDescription?.trim() || "";
                 const payload = {
                     tags,
-                    description_choice: choice,
-                    description: hasDescription ? descriptionValue : null,
+                    description: descriptionValue.trim().length ? descriptionValue : null,
                     source: activeSource,
                     description_rewritten: !!rewrittenDescription && descriptionValue === rewrittenDescription,
+                    raw_description: rawDescription.length ? rawDescription : null,
                 };
                 setMetadataStatus("Applying metadata...");
                 try {

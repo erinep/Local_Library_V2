@@ -262,7 +262,8 @@ def fetch_book_detail(conn: sqlite3.Connection, book_id: int) -> sqlite3.Row | N
             b.author_id AS author_id,
             b.normalized_title,
             a.normalized_author,
-            b.description
+            b.description,
+            b.raw_description
         FROM books b
         LEFT JOIN authors a ON a.id = b.author_id
         WHERE b.id = ?
@@ -280,6 +281,23 @@ def update_book_description(conn: sqlite3.Connection, book_id: int, description:
         WHERE id = ?
         """,
         (description, book_id),
+    )
+    conn.commit()
+
+
+def update_book_raw_description(
+    conn: sqlite3.Connection,
+    book_id: int,
+    raw_description: str | None,
+) -> None:
+    """Update the raw description for app/routes/api.py."""
+    conn.execute(
+        """
+        UPDATE books
+        SET raw_description = ?
+        WHERE id = ?
+        """,
+        (raw_description, book_id),
     )
     conn.commit()
 

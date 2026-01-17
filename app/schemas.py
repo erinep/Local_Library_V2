@@ -48,10 +48,10 @@ class MetadataPrepareResult(BaseModel):
 
 class MetadataApplyRequest(BaseModel):
     tags: list[str] = []
-    description_choice: str | None = None
     description: str | None = None
     source: str | None = None
     description_rewritten: bool = False
+    raw_description: str | None = None
 
 
 class MetadataAiCleanRequest(BaseModel):

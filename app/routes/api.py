@@ -23,6 +23,7 @@ from ..schemas import (
 from ..services.db_queries import (
     fetch_book_detail,
     update_book_description,
+    update_book_raw_description,
 )
 
 
@@ -172,7 +173,9 @@ def build_api_router(
                     tag_ids.append(tag_id)
             added = add_tags_to_book(conn, book_id, tag_ids)
             description_updated = False
-            if payload.description_choice == "include" and payload.description is not None:
+            if payload.source == "google_books" and payload.raw_description:
+                update_book_raw_description(conn, book_id, payload.raw_description)
+            if payload.description is not None:
                 update_book_description(conn, book_id, payload.description)
                 description_updated = True
         return MetadataApplyResult(tags_added=added, description_updated=description_updated)

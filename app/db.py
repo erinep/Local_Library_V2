@@ -62,6 +62,7 @@ def init_db(conn: sqlite3.Connection) -> None:
             created_at REAL NOT NULL,
             normalized_title TEXT,
             description TEXT,
+            raw_description TEXT,
             FOREIGN KEY(author_id) REFERENCES authors(id)
         );
         CREATE TABLE IF NOT EXISTS tags (
@@ -92,6 +93,8 @@ def init_db(conn: sqlite3.Connection) -> None:
     columns = {row["name"] for row in conn.execute("PRAGMA table_info(books)").fetchall()}
     if "description" not in columns:
         conn.execute("ALTER TABLE books ADD COLUMN description TEXT")
+    if "raw_description" not in columns:
+        conn.execute("ALTER TABLE books ADD COLUMN raw_description TEXT")
     conn.commit()
 
 
