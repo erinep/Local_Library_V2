@@ -1,0 +1,20 @@
+{
+    "name": "BookDescription",
+    "schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["content", "reasoning"],
+        "properties": {
+            "content": {
+                "type": "string",
+                "description": "Final output only. No explanation or commentary."
+            },
+            "reasoning": {
+                "type": "string",
+                "maxLength": 500,
+                "description": "Brief explanation of how the result was determined."
+            }
+        }
+    }
+}
+

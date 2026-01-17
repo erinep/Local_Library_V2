@@ -26,6 +26,7 @@ class LlmProvider:
         self._prompt_dir = Path(__file__).resolve().parent / "prompts"
 
     def _build_messages(self, system_prompt_name: str, user_content: str) -> list[Message]:
+        """Build a basic system+user message list for chat completions."""
         messages: list[Message] = []
         system_prompt = self._load_system_prompt(system_prompt_name)
         if system_prompt:
@@ -33,26 +34,70 @@ class LlmProvider:
         messages.append({"role": "user", "content": user_content})
         return messages
 
-    def _chat_payload(self, messages: list[Message]) -> dict[str, object]:
-        return {
+    def _chat_payload(
+        self,
+        messages: list[Message],
+        response_schema: dict[str, object] | None = None,
+    ) -> dict[str, object]:
+        """Create the chat completions payload, with optional JSON schema enforcement."""
+        payload: dict[str, object] = {
             "model": self.model,
             "messages": messages,
             "temperature": 0,
             "max_tokens": 512,
         }
+        if response_schema:
+            payload["response_format"] = response_schema
+        return payload
 
     def _load_system_prompt(self, name: str) -> str | None:
+        """Load a system prompt from the prompts directory."""
         path = self._prompt_dir / f"{name}.txt"
         if not path.is_file():
             return None
         content = path.read_text(encoding="utf-8").strip()
         return content or None
 
+    def _load_response_schema(self, name: str) -> dict[str, object] | None:
+        """Load a JSON schema file and convert it into response_format shape."""
+        path = self._prompt_dir / f"{name}.json"
+        if not path.is_file():
+            return None
+        try:
+            payload = json.loads(path.read_text(encoding="utf-8"))
+        except json.JSONDecodeError as exc:
+            raise HTTPException(status_code=500, detail=f"Schema {name} invalid.") from exc
+        if not isinstance(payload, dict):
+            raise HTTPException(status_code=500, detail=f"Schema {name} invalid.")
+        schema_name = payload.get("name") or name
+        schema = payload.get("schema")
+        if not isinstance(schema_name, str) or not schema_name.strip():
+            raise HTTPException(status_code=500, detail=f"Schema {name} missing name.")
+        if not isinstance(schema, dict):
+            raise HTTPException(status_code=500, detail=f"Schema {name} missing schema.")
+        return {
+            "type": "json_schema",
+            "json_schema": {
+                "name": schema_name,
+                "schema": schema,
+                "strict": True,
+            },
+        }
+
+    def _require_schema(self, name: str) -> dict[str, object]:
+        """Return a loaded schema or raise if missing."""
+        response_schema = self._load_response_schema(name)
+        if response_schema is None:
+            raise HTTPException(status_code=500, detail=f"{name} schema not found.")
+        return response_schema
+
     def _require_config(self) -> None:
+        """Ensure required LLM configuration is present."""
         if not self.base_url or not self.model:
             raise HTTPException(status_code=500, detail="LLM_BASE_URL or LLM_MODEL not configured.")
 
     def _post_chat(self, payload: dict[str, object]) -> dict[str, object]:
+        """POST a chat completion request and return the parsed JSON body."""
         url = f"{self.base_url.rstrip('/')}/v1/chat/completions"
         request = Request(
             url,
@@ -77,6 +122,7 @@ class LlmProvider:
         return body
 
     def _extract_choice(self, body: dict[str, object]) -> dict[str, object]:
+        """Return the first choice from a chat completion response."""
         choices = body.get("choices")
         if not isinstance(choices, list) or not choices:
             raise HTTPException(status_code=502, detail="LLM response missing choices.")
@@ -86,6 +132,7 @@ class LlmProvider:
         return choice
 
     def _choice_content(self, choice: dict[str, object]) -> object | None:
+        """Return the raw content payload for a choice."""
         if "content" in choice:
             return choice.get("content")
         message = choice.get("message")
@@ -94,6 +141,7 @@ class LlmProvider:
         return None
 
     def _extract_reasoning(self, choice: dict[str, object]) -> str | None:
+        """Extract reasoning from known response fields, if present."""
         reasoning = choice.get("reasoning")
         if isinstance(reasoning, str) and reasoning.strip():
             return reasoning.strip()
@@ -117,6 +165,7 @@ class LlmProvider:
         return None
 
     def _extract_content(self, body: dict[str, object], empty_detail: str) -> str:
+        """Extract and validate plain-text content."""
         choice = self._extract_choice(body)
         content = self._choice_content(choice)
         if not isinstance(content, str):
@@ -126,11 +175,53 @@ class LlmProvider:
             raise HTTPException(status_code=502, detail=empty_detail)
         return cleaned
 
+    def _parse_json_content(self, content: object, empty_detail: str) -> dict[str, object]:
+        """Parse a JSON object from string or dict content."""
+        if isinstance(content, dict):
+            parsed = content
+        elif isinstance(content, str):
+            cleaned = content.strip()
+            if not cleaned:
+                raise HTTPException(status_code=502, detail=empty_detail)
+            try:
+                parsed = json.loads(cleaned)
+            except json.JSONDecodeError as exc:
+                raise HTTPException(status_code=502, detail="LLM response JSON invalid.") from exc
+        else:
+            raise HTTPException(status_code=502, detail="LLM response content invalid.")
+        if not isinstance(parsed, dict):
+            raise HTTPException(status_code=502, detail="LLM response JSON must be an object.")
+        return parsed
+
+    def _extract_json_content(self, body: dict[str, object], empty_detail: str) -> dict[str, object]:
+        """Extract JSON content without reasoning."""
+        choice = self._extract_choice(body)
+        content = self._choice_content(choice)
+        return self._parse_json_content(content, empty_detail)
+
+    def _extract_json_content_with_reasoning(
+        self,
+        body: dict[str, object],
+        empty_detail: str,
+    ) -> tuple[dict[str, object], str | None]:
+        """Extract JSON content and a reasoning string if available."""
+        choice = self._extract_choice(body)
+        content = self._choice_content(choice)
+        parsed = self._parse_json_content(content, empty_detail)
+        reasoning = None
+        raw_reasoning = parsed.get("reasoning")
+        if isinstance(raw_reasoning, str) and raw_reasoning.strip():
+            reasoning = raw_reasoning.strip()
+        else:
+            reasoning = self._extract_reasoning(choice)
+        return parsed, reasoning
+
     def _extract_content_with_reasoning(
         self,
         body: dict[str, object],
         empty_detail: str,
     ) -> tuple[str, str | None]:
+        """Extract plain-text content with optional reasoning."""
         choice = self._extract_choice(body)
         content = self._choice_content(choice)
         if not isinstance(content, str):
@@ -140,16 +231,59 @@ class LlmProvider:
             raise HTTPException(status_code=502, detail=empty_detail)
         return cleaned, self._extract_reasoning(choice)
 
+    def _request(
+        self,
+        *,
+        system_prompt_name: str,
+        user_content: str,
+        schema_name: str | None,
+    ) -> dict[str, object]:
+        """Send a request for a prompt, optionally enforcing a response schema."""
+        messages = self._build_messages(system_prompt_name, user_content)
+        response_schema = self._require_schema(schema_name) if schema_name else None
+        return self._post_chat(self._chat_payload(messages, response_schema=response_schema))
+
+    def _text_result(
+        self,
+        body: dict[str, object],
+        *,
+        include_reasoning: bool,
+        empty_detail: str,
+    ) -> tuple[str, str | None]:
+        """Parse a text response with optional reasoning."""
+        if include_reasoning:
+            return self._extract_content_with_reasoning(body, empty_detail)
+        return self._extract_content(body, empty_detail), None
+
+    def _json_result(
+        self,
+        body: dict[str, object],
+        *,
+        include_reasoning: bool,
+        empty_detail: str,
+    ) -> tuple[dict[str, object], str | None]:
+        """Parse a JSON response with optional reasoning."""
+        if include_reasoning:
+            return self._extract_json_content_with_reasoning(body, empty_detail)
+        return self._extract_json_content(body, empty_detail), None
+
     def _parse_tag_json(self, cleaned: str) -> list[str]:
+        """Parse tag mappings from a JSON string payload."""
         try:
             parsed = json.loads(cleaned)
         except json.JSONDecodeError as exc:
             raise HTTPException(status_code=502, detail="LLM tag JSON invalid.") from exc
         if not isinstance(parsed, dict):
             raise HTTPException(status_code=502, detail="LLM tag JSON must be an object.")
+        return self._parse_tag_mapping(parsed)
+
+    def _parse_tag_mapping(self, parsed: dict[str, object]) -> list[str]:
+        """Normalize a tag mapping dict into a flat list of tag strings."""
         tags: list[str] = []
         for key, value in parsed.items():
             key_text = str(key).strip()
+            if key_text.lower() == "reasoning":
+                continue
             if not key_text:
                 continue
             if isinstance(value, list):
@@ -163,35 +297,121 @@ class LlmProvider:
                 tags.append(f"{key_text}:{value_text}")
         return tags
 
+    def _clean_description_text(
+        self,
+        raw_description: str,
+        *,
+        include_reasoning: bool,
+    ) -> tuple[str, str | None]:
+        """Run the clean_description prompt with plain-text output."""
+        body = self._request(
+            system_prompt_name="clean_description",
+            user_content=raw_description,
+            schema_name=None,
+        )
+        return self._text_result(
+            body,
+            include_reasoning=include_reasoning,
+            empty_detail="LLM returned empty description.",
+        )
+
+    def _clean_description_json(
+        self,
+        raw_description: str,
+        *,
+        include_reasoning: bool,
+    ) -> tuple[str, str | None]:
+        """Run the clean_description prompt with schema-enforced JSON output."""
+        body = self._request(
+            system_prompt_name="clean_description",
+            user_content=raw_description,
+            schema_name="BookDescription",
+        )
+        parsed, reasoning = self._json_result(
+            body,
+            include_reasoning=include_reasoning,
+            empty_detail="LLM returned empty description.",
+        )
+        content = parsed.get("content")
+        if not isinstance(content, str):
+            raise HTTPException(status_code=502, detail="LLM response content invalid.")
+        cleaned = content.strip()
+        if not cleaned:
+            raise HTTPException(status_code=502, detail="LLM returned empty description.")
+        return cleaned, reasoning
+
+    def _tag_inference_text(
+        self,
+        raw_description: str,
+        *,
+        include_reasoning: bool,
+    ) -> tuple[list[str], str | None]:
+        """Run tag inference with plain-text JSON output."""
+        body = self._request(
+            system_prompt_name="tag_inference",
+            user_content=raw_description,
+            schema_name=None,
+        )
+        cleaned, reasoning = self._text_result(
+            body,
+            include_reasoning=include_reasoning,
+            empty_detail="LLM returned empty tag JSON.",
+        )
+        return self._parse_tag_json(cleaned), reasoning
+
+    def _tag_inference_json(
+        self,
+        raw_description: str,
+        *,
+        include_reasoning: bool,
+    ) -> tuple[list[str], str | None]:
+        """Run tag inference with schema-enforced JSON output."""
+        body = self._request(
+            system_prompt_name="tag_inference",
+            user_content=raw_description,
+            schema_name="BookClassification",
+        )
+        parsed, reasoning = self._json_result(
+            body,
+            include_reasoning=include_reasoning,
+            empty_detail="LLM returned empty tag JSON.",
+        )
+        return self._parse_tag_mapping(parsed), reasoning
+
     def clean_description(
         self,
         description: str,
         include_reasoning: bool = False,
+        include_schema: bool = False,
     ) -> tuple[str, str | None]:
         """Request a cleaned description (and optional reasoning) from the configured LLM endpoint."""
         self._require_config()
         raw_description = description.strip() or "No description provided"
-        messages = self._build_messages("clean_description", raw_description)
-        body = self._post_chat(self._chat_payload(messages))
-        if include_reasoning:
-            return self._extract_content_with_reasoning(body, "LLM returned empty description.")
-        return self._extract_content(body, "LLM returned empty description."), None
+        if include_schema:
+            return self._clean_description_json(
+                raw_description,
+                include_reasoning=include_reasoning,
+            )
+        return self._clean_description_text(
+            raw_description,
+            include_reasoning=include_reasoning,
+        )
 
     def tag_inference(
         self,
         book_description: str,
         include_reasoning: bool = False,
+        include_schema: bool = False,
     ) -> tuple[list[str], str | None]:
         """Infer normalized tags (and optional reasoning) from a book description via the LLM."""
         self._require_config()
         raw_description = book_description.strip() or "No description provided"
-        messages = self._build_messages("tag_inference", raw_description)
-        body = self._post_chat(self._chat_payload(messages))
-        if include_reasoning:
-            cleaned, reasoning = self._extract_content_with_reasoning(
-                body,
-                "LLM returned empty tag JSON.",
+        if include_schema:
+            return self._tag_inference_json(
+                raw_description,
+                include_reasoning=include_reasoning,
             )
-            return self._parse_tag_json(cleaned), reasoning
-        cleaned = self._extract_content(body, "LLM returned empty tag JSON.")
-        return self._parse_tag_json(cleaned), None
+        return self._tag_inference_text(
+            raw_description,
+            include_reasoning=include_reasoning,
+        )

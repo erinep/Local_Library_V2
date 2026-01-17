@@ -35,6 +35,7 @@ class MetadataProvider(Protocol):
         self,
         description: str,
         include_reasoning: bool = False,
+        include_schema: bool = False,
     ) -> tuple[str, str | None]:
         """Return a normalized 1-3 sentence description and optional reasoning."""
         raise NotImplementedError
@@ -43,6 +44,7 @@ class MetadataProvider(Protocol):
         self,
         book_description: str,
         include_reasoning: bool = False,
+        include_schema: bool = False,
     ) -> tuple[list[str], str | None]:
         """Infer tags from a book description with optional reasoning."""
         raise NotImplementedError

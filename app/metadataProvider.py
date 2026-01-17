@@ -28,16 +28,24 @@ class DefaultMetadataProvider:
         self,
         description: str,
         include_reasoning: bool = False,
+        include_schema: bool = False,
     ):
         return self._llm_provider.clean_description(
             description=description,
             include_reasoning=include_reasoning,
+            include_schema=include_schema,
         )
 
-    def tag_inference(self, book_description: str, include_reasoning: bool = False):
+    def tag_inference(
+        self,
+        book_description: str,
+        include_reasoning: bool = False,
+        include_schema: bool = False,
+    ):
         return self._llm_provider.tag_inference(
             book_description=book_description,
             include_reasoning=include_reasoning,
+            include_schema=include_schema,
         )
 
 

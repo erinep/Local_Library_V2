@@ -1,0 +1,49 @@
+{
+    "name": "BookClassification",
+    "schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+            "PrimaryType",
+            "Mode",
+            "Romance",
+            "Reader",
+            "Setting",
+            "reasoning"
+        ],
+        "properties": {
+            "PrimaryType": {
+                "type": "string",
+                "enum": ["fiction", "non-fiction"]
+            },
+            "Mode": {
+                "type": "string",
+                "enum": [
+                    "mystery",
+                    "adventure",
+                    "humor",
+                    "philosophical",
+                    "technical",
+                    "interior"
+                ]
+            },
+            "Romance": {
+                "type": "number",
+                "minimum": 0.0,
+                "maximum": 1.0
+            },
+            "Reader": {
+                "type": "string",
+                "enum": ["Literary", "Commercial"]
+            },
+            "Setting": {
+                "type": "string",
+                "enum": ["historical", "contemporary", "speculative"]
+            },
+            "reasoning": {
+                "type": "string",
+                "maxLength": 500
+            }
+        }
+    }
+}
