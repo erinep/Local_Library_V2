@@ -16,24 +16,28 @@
     "node_modules",
     "__pycache__"
   ],
-  "db_name": "testing-1.db",
+  "db_name": "testing-3.db",
   "llm_model": "qwen/qwen3-4b-2507",
   "tag_namespace_config": [
     {
-      "tag_prefix": "Genre",
-      "ui_label": "Genre"
+      "tag_prefix": "Mode",
+      "ui_label": "Mode",
+      "style": "checkbox"
     },
     {
       "tag_prefix": "Reader",
-      "ui_label": "Market Placement"
+      "ui_label": "Market Placement",
+      "style": "checkbox"
     },
     {
       "tag_prefix": "Romance",
-      "ui_label": "Romance Weight"
+      "ui_label": "Romance Weight",
+      "style": "range"
     },
     {
       "tag_prefix": "Setting",
-      "ui_label": "Setting"
+      "ui_label": "Setting",
+      "style": "checkbox"
     }
   ],
   "inference_order": [

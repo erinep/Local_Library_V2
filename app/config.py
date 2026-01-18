@@ -8,11 +8,11 @@ from typing import Iterable
 CONFIG_PATH = Path(__file__).resolve().parent.parent / "config.json"
 DEFAULT_DB_NAME = "library.db"
 DEFAULT_TAG_NAMESPACE_CONFIG = [
-    {"tag_prefix": "Genre", "ui_label": "Genre"},
-    {"tag_prefix": "Reader", "ui_label": "Reader"},
-    {"tag_prefix": "Romance", "ui_label": "Romance"},
-    {"tag_prefix": "Setting", "ui_label": "Setting"},
-    {"tag_prefix": "Commitment", "ui_label": "Commitment"},
+    {"tag_prefix": "Genre", "ui_label": "Genre", "style": "checkbox"},
+    {"tag_prefix": "Reader", "ui_label": "Reader", "style": "checkbox"},
+    {"tag_prefix": "Romance", "ui_label": "Romance", "style": "range"},
+    {"tag_prefix": "Setting", "ui_label": "Setting", "style": "checkbox"},
+    {"tag_prefix": "Commitment", "ui_label": "Commitment", "style": "checkbox"},
 ]
 DEFAULT_INFERENCE_ORDER = ["description_clean", "tag_inference"]
 
@@ -52,12 +52,16 @@ def get_tag_namespace_config(path: Path = CONFIG_PATH) -> list[dict[str, str]]:
             continue
         tag_prefix = str(entry.get("tag_prefix") or "").strip()
         ui_label = str(entry.get("ui_label") or tag_prefix).strip()
+        style = str(entry.get("style") or "checkbox").strip().lower()
+        if style not in {"checkbox", "radio", "range"}:
+            style = "checkbox"
         if not tag_prefix:
             continue
         cleaned.append(
             {
                 "tag_prefix": tag_prefix,
                 "ui_label": ui_label or tag_prefix,
+                "style": style,
             }
         )
     return cleaned or list(DEFAULT_TAG_NAMESPACE_CONFIG)

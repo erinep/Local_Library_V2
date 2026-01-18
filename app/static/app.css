@@ -657,6 +657,26 @@ nav a:hover {
   max-height: fit-content;
 }
 
+.recommendations-form .rec-group-range {
+  flex: 0 0 260px;
+  min-width: 240px;
+}
+
+.rec-range {
+  display: grid;
+  gap: 10px;
+}
+
+.rec-range-label {
+  display: grid;
+  gap: 6px;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+  font-weight: 700;
+}
+
 .tag-list-topics {
   margin-top: 8px;
 }

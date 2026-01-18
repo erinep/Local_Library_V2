@@ -128,30 +128,71 @@ def fetch_recommendation_books(
     conn: sqlite3.Connection,
     namespace_filters: dict[str, list[int]],
     topic_ids: list[int],
+    range_filters: dict[str, tuple[float | None, float | None]],
 ) -> list[sqlite3.Row]:
     """Fetch filtered recommendations in app/routes/ui.py."""
-    selected_tag_ids = [tag_id for ids in namespace_filters.values() for tag_id in ids]
-    selected_tag_ids.extend(topic_ids)
-    if not selected_tag_ids:
+    has_namespace = any(namespace_filters.values())
+    has_topics = bool(topic_ids)
+    has_range = any(
+        min_value is not None or max_value is not None
+        for min_value, max_value in range_filters.values()
+    )
+    if not (has_namespace or has_topics or has_range):
         return []
 
-    placeholders = ", ".join("?" for _ in selected_tag_ids)
-    having_clauses: list[str] = []
-    params: list[object] = [*selected_tag_ids]
-    for ids in namespace_filters.values():
+    where_clauses: list[str] = []
+    params: list[object] = []
+
+    for prefix, ids in namespace_filters.items():
         if not ids:
             continue
-        namespace_placeholders = ", ".join("?" for _ in ids)
-        having_clauses.append(
-            f"SUM(CASE WHEN bt.tag_id IN ({namespace_placeholders}) THEN 1 ELSE 0 END) > 0"
+        placeholders = ", ".join("?" for _ in ids)
+        where_clauses.append(
+            f"""
+            EXISTS (
+                SELECT 1
+                FROM book_tags bt
+                WHERE bt.book_id = b.id
+                  AND bt.tag_id IN ({placeholders})
+            )
+            """
         )
         params.extend(ids)
+
     if topic_ids:
         topic_placeholders = ", ".join("?" for _ in topic_ids)
-        having_clauses.append(
-            f"SUM(CASE WHEN bt.tag_id IN ({topic_placeholders}) THEN 1 ELSE 0 END) > 0"
+        where_clauses.append(
+            f"""
+            EXISTS (
+                SELECT 1
+                FROM book_tags bt
+                WHERE bt.book_id = b.id
+                  AND bt.tag_id IN ({topic_placeholders})
+            )
+            """
         )
         params.extend(topic_ids)
+
+    for prefix, (min_value, max_value) in range_filters.items():
+        if min_value is None and max_value is None:
+            continue
+        min_value = 0.0 if min_value is None else min_value
+        max_value = 1.0 if max_value is None else max_value
+        where_clauses.append(
+            """
+            EXISTS (
+                SELECT 1
+                FROM book_tags bt
+                JOIN tags t ON t.id = bt.tag_id
+                WHERE bt.book_id = b.id
+                  AND t.name LIKE ?
+                  AND CAST(substr(t.name, instr(t.name, ':') + 1) AS REAL) BETWEEN ? AND ?
+            )
+            """
+        )
+        params.extend([f"{prefix}:%", min_value, max_value])
+
+    where_sql = " AND ".join(clause.strip() for clause in where_clauses)
 
     return conn.execute(
         f"""
@@ -163,10 +204,7 @@ def fetch_recommendation_books(
             (SELECT COUNT(*) FROM files f WHERE f.book_id = b.id) AS file_count
         FROM books b
         LEFT JOIN authors a ON a.id = b.author_id
-        INNER JOIN book_tags bt ON bt.book_id = b.id
-        WHERE bt.tag_id IN ({placeholders})
-        GROUP BY b.id
-        HAVING {' AND '.join(having_clauses)}
+        WHERE {where_sql}
         ORDER BY RANDOM()
         """,
         params,

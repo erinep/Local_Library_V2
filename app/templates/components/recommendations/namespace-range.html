@@ -1,0 +1,32 @@
+<div class="rec-group rec-group-range" data-rec-group>
+  <div class="rec-group-title">{{ ns['ui_label'] }}</div>
+  {% set range = range_values.get(ns['tag_prefix'], {}) %}
+  {% set min_value = range.get('min') if range.get('min') is not none else '' %}
+  {% set max_value = range.get('max') if range.get('max') is not none else '' %}
+  <div class="rec-range">
+    <label class="rec-range-label">
+      Min
+      <input
+        class="input"
+        type="number"
+        min="0"
+        max="1"
+        step="0.05"
+        name="{{ ns['tag_prefix'] }}_min"
+        value="{{ min_value }}"
+      />
+    </label>
+    <label class="rec-range-label">
+      Max
+      <input
+        class="input"
+        type="number"
+        min="0"
+        max="1"
+        step="0.05"
+        name="{{ ns['tag_prefix'] }}_max"
+        value="{{ max_value }}"
+      />
+    </label>
+  </div>
+</div>

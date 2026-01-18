@@ -9,20 +9,13 @@
       <p class="note">Select one or more per category. Leave blank to include all.</p>
       <div class="tag-form rec-namespace">
         {% for ns in namespace_config %}
-          <div class="rec-group" data-rec-group>
-            <div class="rec-group-title">{{ ns['ui_label'] }}</div>
-            {% for tag in grouped[ns['tag_prefix']] %}
-              <label class="rec-option">
-                <input
-                  type="checkbox"
-                  name="{{ ns['tag_prefix'] }}"
-                  value="{{ tag['id'] }}"
-                  {% if tag['id'] in selected[ns['tag_prefix']] %}checked{% endif %}
-                />
-                {{ tag['display_name'] }}
-              </label>
-            {% endfor %}
-          </div>
+          {% if ns['style'] == "range" %}
+            {% include "components/recommendations/namespace-range.html" %}
+          {% elif ns['style'] == "radio" %}
+            {% include "components/recommendations/namespace-radio.html" %}
+          {% else %}
+            {% include "components/recommendations/namespace-checkbox.html" %}
+          {% endif %}
         {% endfor %}
         <div class="rec-group rec-group-topics" data-rec-group data-rec-topic>
           <div class="rec-group-title">Topics</div>

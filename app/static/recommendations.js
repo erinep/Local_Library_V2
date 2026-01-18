@@ -11,8 +11,9 @@
       if (isTopicGroup) {
         isActive = !!(topicBadges && topicBadges.querySelector("input[name='topic_id']"));
       } else {
-        const checked = group.querySelector("input[type='checkbox']:checked");
-        isActive = !!checked;
+        const checked = group.querySelector("input[type='checkbox']:checked, input[type='radio']:checked");
+        const rangeInput = group.querySelector("input[type='number']");
+        isActive = !!checked || !!rangeInput;
       }
       group.toggleAttribute("data-active", isActive);
     });

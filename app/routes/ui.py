@@ -109,6 +109,17 @@ def build_ui_router(
                     continue
             return parsed
 
+        def _parse_float(value: str | None) -> float | None:
+            if value is None:
+                return None
+            stripped = value.strip()
+            if not stripped:
+                return None
+            try:
+                return float(stripped)
+            except ValueError:
+                return None
+
         query_params = request.query_params
         namespace_filters = {
             entry["tag_prefix"]: _unique_ids(
@@ -116,6 +127,16 @@ def build_ui_router(
             )
             for entry in TAG_NAMESPACE_CONFIG
         }
+        range_filters: dict[str, tuple[float | None, float | None]] = {}
+        range_values: dict[str, dict[str, float | None]] = {}
+        for entry in TAG_NAMESPACE_CONFIG:
+            if entry.get("style") != "range":
+                continue
+            prefix = entry["tag_prefix"]
+            min_value = _parse_float(query_params.get(f"{prefix}_min"))
+            max_value = _parse_float(query_params.get(f"{prefix}_max"))
+            range_filters[prefix] = (min_value, max_value)
+            range_values[prefix] = {"min": min_value, "max": max_value}
         topic_ids = _unique_ids(_parse_int_list(query_params.getlist("topic_id")))
         with get_connection() as conn:
             tag_rows = fetch_tag_rows_for_recommendations(conn)
@@ -137,7 +158,7 @@ def build_ui_router(
                 "Topic": topic_ids,
             }
 
-            rows = fetch_recommendation_books(conn, namespace_filters, topic_ids)
+            rows = fetch_recommendation_books(conn, namespace_filters, topic_ids, range_filters)
             book_cards: list[dict[str, object]] = []
             for row in rows:
                 tags = get_book_tags(conn, int(row["id"]))
@@ -171,6 +192,17 @@ def build_ui_router(
                 if names:
                     summary_label = label_lookup.get(key, key)
                     summary_parts.append(f"{summary_label}: {', '.join(names)}")
+        for entry in TAG_NAMESPACE_CONFIG:
+            if entry.get("style") != "range":
+                continue
+            prefix = entry["tag_prefix"]
+            min_value, max_value = range_filters.get(prefix, (None, None))
+            if min_value is None and max_value is None:
+                continue
+            range_label = label_lookup.get(prefix, prefix)
+            min_text = "0" if min_value is None else str(min_value)
+            max_text = "1" if max_value is None else str(max_value)
+            summary_parts.append(f"{range_label}: {min_text} - {max_text}")
             if topic_ids:
                 names = [topic_labels.get(tid) for tid in topic_ids if topic_labels.get(tid)]
                 if names:
@@ -187,6 +219,7 @@ def build_ui_router(
                 "selected": selected,
                 "books": book_cards,
                 "summary": summary,
+                "range_values": range_values,
             },
         )
 

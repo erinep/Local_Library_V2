@@ -30,19 +30,23 @@ if ($redisService) {
 $env:REDIS_URL = "redis://127.0.0.1:6379/0"
 
 $webLog = Join-Path $logDir "web.log"
-$webErr = Join-Path $logDir "web.err.log"
 $workerLog = Join-Path $logDir "worker.log"
-$workerErr = Join-Path $logDir "worker.err.log"
 
 Write-Host "Starting web server (logs: $webLog)..."
-$webProcess = Start-Process -FilePath $venvPython -ArgumentList @(
-    "-m", "uvicorn", "app.main:app", "--reload"
-) -RedirectStandardOutput $webLog -RedirectStandardError $webErr -PassThru -NoNewWindow
+$webCommand = "& `"$venvPython`" -m uvicorn app.main:app --reload 2>&1 | Out-File -FilePath `"$webLog`" -Encoding utf8 -Append"
+$webProcess = Start-Process -FilePath powershell -ArgumentList @(
+    "-NoProfile",
+    "-Command",
+    $webCommand
+) -PassThru -NoNewWindow
 
 Write-Host "Starting RQ worker (logs: $workerLog)..."
-$workerProcess = Start-Process -FilePath $rqExe -ArgumentList @(
-    "worker", "metadata", "--url", $env:REDIS_URL, "--worker-class", "rq.worker.SimpleWorker"
-) -RedirectStandardOutput $workerLog -RedirectStandardError $workerErr -PassThru -NoNewWindow
+$workerCommand = "& `"$rqExe`" worker metadata --url $env:REDIS_URL --worker-class rq.worker.SimpleWorker 2>&1 | Out-File -FilePath `"$workerLog`" -Encoding utf8 -Append"
+$workerProcess = Start-Process -FilePath powershell -ArgumentList @(
+    "-NoProfile",
+    "-Command",
+    $workerCommand
+) -PassThru -NoNewWindow
 
 Write-Host "Press Ctrl+C to stop web + worker."
 try {

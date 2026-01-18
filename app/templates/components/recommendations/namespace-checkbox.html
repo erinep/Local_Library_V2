@@ -1,0 +1,14 @@
+<div class="rec-group" data-rec-group>
+  <div class="rec-group-title">{{ ns['ui_label'] }}</div>
+  {% for tag in grouped[ns['tag_prefix']] %}
+    <label class="rec-option">
+      <input
+        type="checkbox"
+        name="{{ ns['tag_prefix'] }}"
+        value="{{ tag['id'] }}"
+        {% if tag['id'] in selected[ns['tag_prefix']] %}checked{% endif %}
+      />
+      {{ tag['display_name'] }}
+    </label>
+  {% endfor %}
+</div>
