@@ -23,6 +23,7 @@ class ScanConfig:
     library_roots: list[Path]
     allowed_extensions: set[str]
     ignore_patterns: list[str]
+    llm_model: str | None
 
 
 def load_config(path: Path = CONFIG_PATH) -> ScanConfig:
@@ -32,11 +33,13 @@ def load_config(path: Path = CONFIG_PATH) -> ScanConfig:
     roots = [Path(p) for p in raw.get("library_roots", [])]
     allowed = {ext.lower() for ext in raw.get("allowed_extensions", [])}
     ignore = list(raw.get("ignore_patterns", []))
+    llm_model = str(raw.get("llm_model") or "").strip() or None
     return ScanConfig(
         db_path=db_path,
         library_roots=roots,
         allowed_extensions=allowed,
         ignore_patterns=ignore,
+        llm_model=llm_model,
     )
 
 

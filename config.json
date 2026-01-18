@@ -17,6 +17,7 @@
     "__pycache__"
   ],
   "db_name": "testing-1.db",
+  "llm_model": "qwen/qwen3-4b-2507",
   "tag_namespace_config": [
     {
       "tag_prefix": "Genre",

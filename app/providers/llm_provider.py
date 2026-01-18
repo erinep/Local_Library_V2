@@ -9,6 +9,8 @@ from urllib.request import Request, urlopen
 
 from fastapi import HTTPException
 
+from ..config import load_config
+
 Message = dict[str, object]
 
 class LlmProvider:
@@ -101,7 +103,12 @@ class LlmProvider:
 
     def _require_config(self) -> None:
         """Ensure required LLM configuration is present."""
-        if not self.base_url or not self.model:
+        if not self.base_url:
+            raise HTTPException(status_code=500, detail="LLM_BASE_URL or LLM_MODEL not configured.")
+        config_model = load_config().llm_model
+        if config_model:
+            self.model = config_model
+        if not self.model:
             raise HTTPException(status_code=500, detail="LLM_BASE_URL or LLM_MODEL not configured.")
 
     def _post_chat(self, payload: dict[str, object]) -> dict[str, object]:
