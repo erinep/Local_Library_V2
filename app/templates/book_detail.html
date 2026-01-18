@@ -141,7 +141,7 @@
     </div>
   </section>
 
-  {% call modal.modal("fetch-metadata", "Fetch Metadata", 'data-metadata-modal') %}
+  {% call modal.modal("fetch-metadata", "Fetch Metadata — " ~ book['title'], 'data-metadata-modal') %}
     <p class="note" data-metadata-status>Ready to search.</p>
     <div class="tag-form">
       <input class="input" type="text" data-metadata-title placeholder="Title" />
@@ -151,7 +151,7 @@
     <div class="list" data-metadata-results></div>
     {% endcall %}
 
-  {% call modal.modal("metadata-review", "Review Metadata", 'data-metadata-review-modal') %}
+  {% call modal.modal("metadata-review", "Review Metadata — " ~ book['title'], 'data-metadata-review-modal') %}
     <div class="metadata-review" data-metadata-review>
       <p class="note">Tags</p>
       <div class="tag-list" data-metadata-tags></div>
@@ -168,7 +168,7 @@
     </div>
   {% endcall %}
 
-  {% call modal.modal("metadata-processing", "Processing Metadata", 'data-metadata-processing-modal') %}
+  {% call modal.modal("metadata-processing", "Processing Metadata — " ~ book['title'], 'data-metadata-processing-modal') %}
     <div class="metadata-processing">
       <div class="metadata-loading-panel">
         <div class="spinner" data-metadata-ai-spinner aria-hidden="true"></div>
@@ -180,5 +180,6 @@
 
 {% endblock %}
 {% block scripts %}
+  <script src="/static/metadata_workflow.js"></script>
   <script src="/static/book_details.js"></script>
 {% endblock %}

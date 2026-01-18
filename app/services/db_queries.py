@@ -97,6 +97,21 @@ def fetch_bulk_export_rows(conn: sqlite3.Connection) -> list[sqlite3.Row]:
     ).fetchall()
 
 
+def fetch_books_for_metadata(conn: sqlite3.Connection) -> list[sqlite3.Row]:
+    """Fetch minimal book data for bulk metadata workflows."""
+    return conn.execute(
+        """
+        SELECT
+            b.id,
+            b.title,
+            a.name AS author
+        FROM books b
+        LEFT JOIN authors a ON a.id = b.author_id
+        ORDER BY b.id
+        """
+    ).fetchall()
+
+
 def fetch_tag_rows_for_recommendations(conn: sqlite3.Connection) -> list[sqlite3.Row]:
     """Fetch tag rows for filters in app/routes/ui.py."""
     return conn.execute(

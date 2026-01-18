@@ -10,6 +10,7 @@ from fastapi import APIRouter, File, Form, HTTPException, Response, UploadFile
 from ..services.db_queries import (
     book_exists,
     fetch_bulk_export_rows,
+    fetch_books_for_metadata,
     log_activity,
 )
 from ..services.ingest import parse_tag_columns
@@ -90,6 +91,20 @@ def build_bulk_actions_router(
                 source="bulk_actions_export",
             )
         return Response(content=output.getvalue(), media_type="text/csv", headers=headers)
+
+    @router.get("/bulk-actions/metadata/books")
+    def bulk_actions_metadata_books() -> list[dict[str, object]]:
+        """Return basic book info for bulk metadata workflows."""
+        with get_connection() as conn:
+            rows = fetch_books_for_metadata(conn)
+        return [
+            {
+                "id": int(row["id"]),
+                "title": row["title"],
+                "author": row["author"] or "",
+            }
+            for row in rows
+        ]
 
     @router.post("/bulk-actions/cleanup-tags")
     def bulk_actions_cleanup_tags() -> dict[str, int]:

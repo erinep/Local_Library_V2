@@ -124,17 +124,23 @@
 
     const metadataModal = document.querySelector("[data-modal-id='fetch-metadata']");
     const metadataReviewModal = document.querySelector("[data-modal-id='metadata-review']");
-    if (metadataModal && metadataReviewModal) {
+    const metadataProcessingModal = document.querySelector("[data-modal-id='metadata-processing']");
+    if (metadataModal && metadataReviewModal && window.MetadataWorkflow) {
+        const {
+            searchMetadata,
+            prepareMetadata,
+            runAiCleanupFlow,
+            applyMetadata,
+            createLogRenderer,
+        } = window.MetadataWorkflow;
         const metadataStatus = metadataModal.querySelector("[data-metadata-status]");
         const metadataTitle = metadataModal.querySelector("[data-metadata-title]");
         const metadataAuthor = metadataModal.querySelector("[data-metadata-author]");
         const metadataSearch = metadataModal.querySelector("[data-metadata-search]");
         const metadataResults = metadataModal.querySelector("[data-metadata-results]");
-        const metadataReview = metadataReviewModal.querySelector("[data-metadata-review]");
         const metadataTags = metadataReviewModal.querySelector("[data-metadata-tags]");
         const metadataDescription = metadataReviewModal.querySelector("[data-metadata-description]");
         const metadataApply = metadataReviewModal.querySelector("[data-metadata-apply]");
-        const metadataProcessingModal = document.querySelector("[data-modal-id='metadata-processing']");
         const metadataDescWrap = metadataReviewModal.querySelector("[data-metadata-desc-wrap]");
         const metadataBack = metadataReviewModal.querySelector("[data-metadata-back]");
         const metadataCancel = metadataReviewModal.querySelector("[data-metadata-cancel]");
@@ -144,6 +150,8 @@
         const metadataAiSpinner = metadataProcessingModal
             ? metadataProcessingModal.querySelector("[data-metadata-ai-spinner]")
             : null;
+        const logRenderer = createLogRenderer(metadataAiLog);
+
         let activeResult = null;
         let originalDescription = "";
         let rewrittenDescription = "";
@@ -163,8 +171,14 @@
             rewrittenDescription = "";
             activeResult = null;
             activeSource = "google_books";
-            if (metadataAiLog) {
-                metadataAiLog.innerHTML = "";
+            if (logRenderer) {
+                logRenderer.reset();
+            }
+        };
+
+        const openProcessingModal = () => {
+            if (window.ModalController) {
+                window.ModalController.open("metadata-processing");
             }
         };
 
@@ -179,6 +193,31 @@
             if (metadataApply) {
                 metadataApply.disabled = false;
             }
+        };
+
+        const applyTags = (tags) => {
+            const list = Array.isArray(tags) ? tags : [];
+            if (!list.length || !metadataTags) return;
+            const existing = new Set(
+                Array.from(metadataTags.querySelectorAll("input[type='checkbox']"))
+                    .map((input) => input.value)
+            );
+            list.forEach((tag) => {
+                const cleaned = String(tag).trim();
+                if (!cleaned || existing.has(cleaned)) return;
+                existing.add(cleaned);
+                const pill = document.createElement("label");
+                pill.className = "tag-pill tag-pill-proposed";
+                const checkbox = document.createElement("input");
+                checkbox.type = "checkbox";
+                checkbox.checked = true;
+                checkbox.value = cleaned;
+                const text = document.createElement("span");
+                text.textContent = cleaned;
+                pill.appendChild(checkbox);
+                pill.appendChild(text);
+                metadataTags.appendChild(pill);
+            });
         };
 
         const renderResults = (results) => {
@@ -273,13 +312,61 @@
                     activeSource = result.source || "google_books";
                     setMetadataStatus("Preparing metadata for review...");
                     if (window.ModalController) {
-                        window.ModalController.open("metadata-processing");
                         window.ModalController.close("fetch-metadata");
+                        openProcessingModal();
                     }
-                    const ok = await prepareMetadata();
-                    if (ok) {
-                        runAiCleanup();
+                    const payload = await prepareMetadata({
+                        bookId: activeBookId,
+                        result: {
+                            ...activeResult,
+                            source: activeSource,
+                        },
+                    }).catch(() => null);
+                    if (!payload) {
+                        setMetadataStatus("Unable to prepare metadata for review.");
+                        return;
                     }
+                    if (metadataTags) {
+                        metadataTags.innerHTML = "";
+                        (payload.tags || []).forEach((tag) => {
+                            const pill = document.createElement("label");
+                            pill.className = "tag-pill tag-pill-proposed";
+                            const checkbox = document.createElement("input");
+                            checkbox.type = "checkbox";
+                            checkbox.checked = true;
+                            checkbox.value = tag;
+                            const text = document.createElement("span");
+                            text.textContent = tag;
+                            pill.appendChild(checkbox);
+                            pill.appendChild(text);
+                            metadataTags.appendChild(pill);
+                        });
+                    }
+                    originalDescription = payload.description || activeResult.description || "";
+                    rewrittenDescription = "";
+                    if (metadataDescription) {
+                        metadataDescription.value = originalDescription;
+                    }
+                    setMetadataStatus("Metadata ready for review.");
+                    const raw = metadataDescription?.value.trim() || originalDescription || "";
+                    await runAiCleanupFlow({
+                        bookId: activeBookId,
+                        description: raw,
+                        logRenderer,
+                        setStatus: setMetadataStatus,
+                        onDescription: (text) => {
+                            rewrittenDescription = text;
+                            metadataDescription.value = text;
+                        },
+                        onTags: applyTags,
+                        onDone: openReviewModal,
+                        onError: () => {
+                            setMetadataStatus("AI cleanup failed.");
+                        },
+                        descWrap: metadataDescWrap,
+                        applyButton: metadataApply,
+                        spinner: metadataAiSpinner,
+                    });
                 });
                 actions.appendChild(selectButton);
 
@@ -287,54 +374,6 @@
                 item.appendChild(actions);
                 metadataResults.appendChild(item);
             });
-        };
-
-        const prepareMetadata = async () => {
-            if (!activeResult || !activeBookId) return;
-            try {
-                const response = await fetch(`/books/${activeBookId}/metadata/prepare`, {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({
-                        result_id: activeResult.result_id,
-                        title: activeResult.title,
-                        author: activeResult.author,
-                        categories: activeResult.categories || [],
-                        description: activeResult.description || "",
-                        source: activeSource,
-                    }),
-                });
-                if (!response.ok) {
-                    throw new Error("Failed to prepare metadata.");
-                }
-                const payload = await response.json();
-                if (metadataTags) {
-                    metadataTags.innerHTML = "";
-                    (payload.tags || []).forEach((tag) => {
-                        const pill = document.createElement("label");
-                        pill.className = "tag-pill tag-pill-proposed";
-                        const checkbox = document.createElement("input");
-                        checkbox.type = "checkbox";
-                        checkbox.checked = true;
-                        checkbox.value = tag;
-                        const text = document.createElement("span");
-                        text.textContent = tag;
-                        pill.appendChild(checkbox);
-                        pill.appendChild(text);
-                        metadataTags.appendChild(pill);
-                    });
-                }
-                originalDescription = payload.description || activeResult.description || "";
-                rewrittenDescription = "";
-                if (metadataDescription) {
-                    metadataDescription.value = originalDescription;
-                }
-                setMetadataStatus("Metadata ready for review.");
-                return true;
-            } catch (error) {
-                setMetadataStatus("Unable to prepare metadata for review.");
-                return false;
-            }
         };
 
         if (metadataSearch) {
@@ -345,15 +384,11 @@
                 const authorValue = metadataAuthor.value.trim();
                 setMetadataStatus("Searching external metadata...");
                 try {
-                    const response = await fetch(`/books/${activeBookId}/metadata/search`, {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ title: titleValue, author: authorValue }),
+                    const results = await searchMetadata({
+                        bookId: activeBookId,
+                        title: titleValue,
+                        author: authorValue,
                     });
-                    if (!response.ok) {
-                        throw new Error("Search failed.");
-                    }
-                    const results = await response.json();
                     renderResults(results);
                     setMetadataStatus("Select a result to prepare metadata.");
                 } catch (error) {
@@ -380,14 +415,14 @@
                 };
                 setMetadataStatus("Applying metadata...");
                 try {
-                    const response = await fetch(`/books/${activeBookId}/metadata/apply`, {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify(payload),
+                    await applyMetadata({
+                        bookId: activeBookId,
+                        tags: payload.tags,
+                        description: payload.description,
+                        source: payload.source,
+                        rawDescription: payload.raw_description,
+                        descriptionRewritten: payload.description_rewritten,
                     });
-                    if (!response.ok) {
-                        throw new Error("Apply failed.");
-                    }
                     if (window.ModalController) {
                         window.ModalController.close("metadata-review");
                         window.ModalController.close("fetch-metadata");
@@ -398,207 +433,6 @@
                 }
             });
         }
-
-        const runAiCleanup = async () => {
-            if (!metadataDescription || !metadataTags || !activeBookId) return;
-                const scrollLogToBottom = () => {
-                    if (!metadataAiLog) return;
-                    const log = metadataAiLog;
-                    requestAnimationFrame(() => {
-                        log.scrollTop = log.scrollHeight;
-                    });
-                };
-                const logEntries = new Map();
-                const renderLogEntry = (payload, eventType) => {
-                    if (!metadataAiLog) return;
-                    const stepId = payload.step_id || payload.action || eventType;
-                    let entry = logEntries.get(stepId);
-                    if (!entry) {
-                        entry = document.createElement("div");
-                        entry.className = "metadata-ai-log-entry";
-                        const header = document.createElement("div");
-                        header.className = "metadata-ai-log-header";
-                        const title = document.createElement("span");
-                        title.className = "metadata-ai-log-title";
-                        title.textContent = payload.action || payload.status || eventType;
-                        header.appendChild(title);
-                        entry.appendChild(header);
-                        const reasoningEl = document.createElement("div");
-                        reasoningEl.className = "metadata-ai-log-reasoning";
-                        entry.appendChild(reasoningEl);
-                        const outputWrap = document.createElement("div");
-                        outputWrap.className = "metadata-ai-log-outputs";
-                        entry.appendChild(outputWrap);
-                        metadataAiLog.appendChild(entry);
-                        logEntries.set(stepId, entry);
-                    }
-                    const reasoningEl = entry.querySelector(".metadata-ai-log-reasoning");
-                    const outputWrap = entry.querySelector(".metadata-ai-log-outputs");
-                    if (reasoningEl) {
-                        const text = payload.reasoning ? `Reasoning: ${payload.reasoning}` : "";
-                        reasoningEl.textContent = text;
-                        reasoningEl.toggleAttribute("hidden", !text);
-                    }
-                    if (outputWrap) {
-                        if (eventType === "begin") {
-                            outputWrap.innerHTML = "";
-                        } else if (eventType === "result") {
-                            outputWrap.innerHTML = "";
-                            if (payload.description) {
-                                const line = document.createElement("div");
-                                line.className = "metadata-ai-log-output-line";
-                                line.textContent = payload.description;
-                                outputWrap.appendChild(line);
-                            }
-                            if (payload.value) {
-                                const line = document.createElement("div");
-                                line.className = "metadata-ai-log-output-line";
-                                line.textContent = payload.value;
-                                outputWrap.appendChild(line);
-                            }
-                        }
-                    }
-                    scrollLogToBottom();
-                };
-                const applyTags = (tags) => {
-                    const list = Array.isArray(tags) ? tags : [];
-                    if (!list.length) return;
-                    const existing = new Set(
-                        Array.from(metadataTags.querySelectorAll("input[type='checkbox']"))
-                            .map((input) => input.value)
-                    );
-                    list.forEach((tag) => {
-                        const cleaned = String(tag).trim();
-                        if (!cleaned || existing.has(cleaned)) return;
-                        existing.add(cleaned);
-                        const pill = document.createElement("label");
-                        pill.className = "tag-pill tag-pill-proposed";
-                        const checkbox = document.createElement("input");
-                        checkbox.type = "checkbox";
-                        checkbox.checked = true;
-                        checkbox.value = cleaned;
-                        const text = document.createElement("span");
-                        text.textContent = cleaned;
-                        pill.appendChild(checkbox);
-                        pill.appendChild(text);
-                        metadataTags.appendChild(pill);
-                    });
-                };
-                const raw = metadataDescription.value.trim() || originalDescription || "";
-                setMetadataStatus("Running AI cleanup...");
-                if (metadataDescWrap) {
-                    metadataDescWrap.classList.add("is-loading");
-                }
-                if (metadataAiLog) {
-                    metadataAiLog.innerHTML = "";
-                }
-                if (metadataApply) {
-                    metadataApply.disabled = true;
-                }
-                if (metadataAiSpinner) {
-                    metadataAiSpinner.removeAttribute("hidden");
-                }
-                try {
-                    const response = await fetch(`/books/${activeBookId}/metadata/ai_clean/stream`, {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({
-                            description: raw,
-                        }),
-                    });
-                    if (!response.ok) {
-                        throw new Error("AI clean failed.");
-                    }
-                    const reader = response.body?.getReader();
-                    if (!reader) {
-                        const fallbackText = await response.text();
-                        if (fallbackText) {
-                            renderLogEntry({ status: fallbackText }, "message");
-                        }
-                        setMetadataStatus("AI updates ready for review.");
-                        if (metadataAiSpinner) {
-                            metadataAiSpinner.setAttribute("hidden", "");
-                        }
-                        openReviewModal();
-                        return;
-                    }
-                    const decoder = new TextDecoder();
-                    let buffer = "";
-                    const handleEventBlock = (block) => {
-                        const lines = block.split("\n").filter((line) => line.trim().length > 0);
-                        let eventName = "message";
-                        const dataLines = [];
-                        lines.forEach((line) => {
-                            if (line.startsWith("event:")) {
-                                eventName = line.slice(6).trim();
-                                return;
-                            }
-                            if (line.startsWith("data:")) {
-                                dataLines.push(line.slice(5).trimStart());
-                            }
-                        });
-                        const payloadText = dataLines.join("\n").trim();
-                        let payload = {};
-                        if (payloadText) {
-                            try {
-                                payload = JSON.parse(payloadText);
-                            } catch (error) {
-                                renderLogEntry({ status: "Malformed event payload." }, "error");
-                            }
-                        }
-                        if (eventName === "begin") {
-                            renderLogEntry(payload, eventName);
-                        }
-                        if (payload.description) {
-                            rewrittenDescription = String(payload.description);
-                            metadataDescription.value = rewrittenDescription;
-                        }
-                        if (payload.tags) {
-                            applyTags(payload.tags);
-                        }
-                        if (eventName === "result") {
-                            renderLogEntry(payload, eventName);
-                        }
-                        if (eventName === "error" && payload.detail) {
-                            renderLogEntry({ ...payload, reasoning: payload.detail }, eventName);
-                            setMetadataStatus("AI cleanup failed.");
-                            if (metadataAiSpinner) {
-                                metadataAiSpinner.setAttribute("hidden", "");
-                            }
-                        }
-                        if (eventName === "done") {
-                            setMetadataStatus("AI updates ready for review.");
-                            if (metadataAiSpinner) {
-                                metadataAiSpinner.setAttribute("hidden", "");
-                            }
-                            openReviewModal();
-                        }
-                    };
-                    while (true) {
-                        const { value, done } = await reader.read();
-                        if (done) break;
-                        buffer += decoder.decode(value, { stream: true });
-                        buffer = buffer.replace(/\r/g, "");
-                        const parts = buffer.split("\n\n");
-                        buffer = parts.pop() || "";
-                        parts.forEach(handleEventBlock);
-                    }
-                    if (buffer.trim()) {
-                        handleEventBlock(buffer);
-                    }
-                } catch (error) {
-                    setMetadataStatus("Unable to run AI cleanup.");
-                    if (metadataAiLog) {
-                        const entry = document.createElement("div");
-                        entry.className = "note";
-                        entry.textContent = "AI request failed.";
-                        metadataAiLog.appendChild(entry);
-                    }
-                    if (metadataAiSpinner) {
-                        metadataAiSpinner.setAttribute("hidden", "");
-                    }
-                }
-        };
 
         if (metadataBack) {
             metadataBack.addEventListener("click", () => {
@@ -618,23 +452,6 @@
             });
         }
 
-        metadataReviewModal.addEventListener("click", (event) => {
-            const closeButton = event.target.closest("[data-modal-close]");
-            if (!closeButton) return;
-            if (window.ModalController) {
-                window.ModalController.close("metadata-review");
-                window.ModalController.close("fetch-metadata");
-            }
-        });
-
-        metadataModal.addEventListener("click", (event) => {
-            const closeButton = event.target.closest("[data-modal-close]");
-            if (!closeButton) return;
-            if (window.ModalController) {
-                window.ModalController.close("metadata-review");
-            }
-        });
-
         document.addEventListener("click", (event) => {
             const trigger = event.target.closest("[data-modal-open='fetch-metadata']");
             if (!trigger) return;
@@ -646,15 +463,6 @@
             resetMetadataView();
             setMetadataStatus("Ready to search.");
         });
-
-        if (window.ModalController) {
-            const originalOpen = window.ModalController.open?.bind(window.ModalController);
-            if (originalOpen) {
-                window.ModalController.open = (modalId) => {
-                    return originalOpen(modalId);
-                };
-            }
-        }
     }
 
     const copyButtons = document.querySelectorAll("[data-copy-path]");
