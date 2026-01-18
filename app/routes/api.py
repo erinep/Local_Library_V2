@@ -189,8 +189,35 @@ def build_api_router(
         title = payload.title or ""
         author = payload.author or ""
         description = payload.description or ""
+        raw_description = description
         tags: list[str] = []
         steps: list[MetadataAiStep] = []
+        tag_mapping: dict[str, object] = {}
+        tag_prompt_lookup = {field: prompt for field, prompt in books_provider.get_tag_inference_fields()}
+
+        def _resolve_tag_field(step_name: str) -> str | None:
+            field_key = step_name.replace("tag_inference_", "").replace("_", "").lower()
+            for candidate in tag_prompt_lookup:
+                if candidate.replace("_", "").lower() == field_key:
+                    return candidate
+            return None
+
+        def _build_tags_from_mapping(tag_mapping: dict[str, object]) -> list[str]:
+            tags: list[str] = []
+            for key, value in tag_mapping.items():
+                key_text = str(key).strip()
+                if not key_text:
+                    continue
+                if isinstance(value, list):
+                    for item in value:
+                        value_text = str(item).strip()
+                        if value_text:
+                            tags.append(f"{key_text}:{value_text}")
+                    continue
+                value_text = str(value).strip()
+                if value_text:
+                    tags.append(f"{key_text}:{value_text}")
+            return tags
         for step in get_inference_order():
             if step == "description_clean":
                 cleaned, reasoning = books_provider.clean_description(
@@ -201,8 +228,25 @@ def build_api_router(
                     description = cleaned
                 steps.append(MetadataAiStep(action="description_clean", reasoning=reasoning))
             elif step == "tag_inference":
-                tags, reasoning = books_provider.tag_inference(description, include_reasoning=True)
-                steps.append(MetadataAiStep(action="tag_inference", reasoning=reasoning))
+                tags, tag_steps = books_provider.tag_inference_split(raw_description, include_reasoning=True)
+                for action, reasoning in tag_steps:
+                    steps.append(MetadataAiStep(action=action, reasoning=reasoning))
+            elif step.startswith("tag_inference_"):
+                field = _resolve_tag_field(step)
+                if not field:
+                    continue
+                prompt_name = tag_prompt_lookup.get(field)
+                if not prompt_name:
+                    continue
+                value, reasoning = books_provider.tag_inference_field(
+                    raw_description,
+                    field=field,
+                    prompt_name=prompt_name,
+                    include_reasoning=True,
+                )
+                tag_mapping[field] = value
+                tags = _build_tags_from_mapping(tag_mapping)
+                steps.append(MetadataAiStep(action=step, reasoning=reasoning))
         return MetadataAiCleanResult(description=description or None, tags=tags, steps=steps)
 
     @router.post("/books/{book_id}/metadata/ai_clean/stream")
@@ -214,6 +258,24 @@ def build_api_router(
         title = payload.title or ""
         author = payload.author or ""
         description = payload.description or ""
+        raw_description = description
+
+        def _build_tags_from_mapping(tag_mapping: dict[str, object]) -> list[str]:
+            tags: list[str] = []
+            for key, value in tag_mapping.items():
+                key_text = str(key).strip()
+                if not key_text:
+                    continue
+                if isinstance(value, list):
+                    for item in value:
+                        value_text = str(item).strip()
+                        if value_text:
+                            tags.append(f"{key_text}:{value_text}")
+                    continue
+                value_text = str(value).strip()
+                if value_text:
+                    tags.append(f"{key_text}:{value_text}")
+            return tags
 
         def _send_event(event: str, data: dict[str, object]) -> bytes:
             payload_text = json.dumps(data, ensure_ascii=True)
@@ -222,10 +284,17 @@ def build_api_router(
         def _generate():
             nonlocal description
             try:
-                yield _send_event("ping", {"status": "started"})
+                tag_mapping: dict[str, object] = {}
+                tag_prompt_lookup = {field: prompt for field, prompt in books_provider.get_tag_inference_fields()}
                 for step in get_inference_order():
                     if step == "description_clean":
-                        yield _send_event("step_start", {"action": "description_clean"})
+                        yield _send_event(
+                            "begin",
+                            {
+                                "step_id": "description_clean",
+                                "action": "description_clean",
+                            },
+                        )
                         cleaned, reasoning = books_provider.clean_description(
                             description=description,
                             include_reasoning=True,
@@ -233,20 +302,82 @@ def build_api_router(
                         if cleaned:
                             description = cleaned
                         yield _send_event(
-                            "step_result",
+                            "result",
                             {
+                                "step_id": "description_clean",
                                 "action": "description_clean",
                                 "description": description,
                                 "reasoning": reasoning,
                             },
                         )
                     elif step == "tag_inference":
-                        yield _send_event("step_start", {"action": "tag_inference"})
-                        tags, reasoning = books_provider.tag_inference(description, include_reasoning=True)
+                        for field, prompt_name in books_provider.get_tag_inference_fields():
+                            action = f"tag_inference_{field.lower()}"
+                            yield _send_event(
+                                "begin",
+                                {
+                                    "step_id": action,
+                                    "action": action,
+                                    "field": field,
+                                },
+                            )
+                            value, reasoning = books_provider.tag_inference_field(
+                                raw_description,
+                                field=field,
+                                prompt_name=prompt_name,
+                                include_reasoning=True,
+                            )
+                            tag_mapping[field] = value
+                            tags = _build_tags_from_mapping({field: value})
+                            value_text = tags[0] if tags else None
+                            yield _send_event(
+                                "result",
+                                {
+                                    "step_id": action,
+                                    "action": action,
+                                    "field": field,
+                                    "value": value_text,
+                                    "tags": tags,
+                                    "reasoning": reasoning,
+                                },
+                            )
+                    elif step.startswith("tag_inference_"):
+                        field_key = step.replace("tag_inference_", "").replace("_", "").lower()
+                        field = None
+                        for candidate in tag_prompt_lookup:
+                            if candidate.replace("_", "").lower() == field_key:
+                                field = candidate
+                                break
+                        if not field:
+                            continue
+                        prompt_name = tag_prompt_lookup.get(field)
+                        if not prompt_name:
+                            continue
+                        action = step
                         yield _send_event(
-                            "step_result",
+                            "begin",
                             {
-                                "action": "tag_inference",
+                                "step_id": action,
+                                "action": action,
+                                "field": field,
+                            },
+                        )
+                        value, reasoning = books_provider.tag_inference_field(
+                            raw_description,
+                            field=field,
+                            prompt_name=prompt_name,
+                            include_reasoning=True,
+                        )
+                        tag_mapping[field] = value
+                        tags = _build_tags_from_mapping({field: value})
+                        value_text = tags[0] if tags else None
+                        yield _send_event(
+                            "result",
+                            {
+                                "step_id": action,
+                                "action": action,
+                                "field": field,
+                                "value": value_text,
                                 "tags": tags,
                                 "reasoning": reasoning,
                             },

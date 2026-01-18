@@ -48,6 +48,34 @@ class DefaultMetadataProvider:
             include_schema=include_schema,
         )
 
+    def get_tag_inference_fields(self):
+        return self._llm_provider.get_tag_inference_fields()
+
+    def tag_inference_field(
+        self,
+        book_description: str,
+        *,
+        field: str,
+        prompt_name: str,
+        include_reasoning: bool = False,
+    ):
+        return self._llm_provider.tag_inference_field(
+            book_description=book_description,
+            field=field,
+            prompt_name=prompt_name,
+            include_reasoning=include_reasoning,
+        )
+
+    def tag_inference_split(
+        self,
+        book_description: str,
+        include_reasoning: bool = False,
+    ):
+        return self._llm_provider.tag_inference_split(
+            book_description=book_description,
+            include_reasoning=include_reasoning,
+        )
+
 
 def get_default_provider() -> MetadataProvider:
     """Return the default metadata provider used by app/main.py."""

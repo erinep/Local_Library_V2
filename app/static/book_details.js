@@ -391,22 +391,64 @@
         if (metadataAiClean) {
             metadataAiClean.addEventListener("click", async () => {
                 if (!metadataDescription || !metadataTags || !activeBookId) return;
-                const appendLogEntry = (desc) => {
+                const scrollLogToBottom = () => {
                     if (!metadataAiLog) return;
-                    const entry = document.createElement("div");
-                    entry.className = "metadata-ai-log-line";
-                    const typeSpan = document.createElement("span");
-                    typeSpan.className = "metadata-ai-log-type";
-                    typeSpan.textContent = "INFO:";
-                    const sepSpan = document.createElement("span");
-                    sepSpan.textContent = " ";
-                    const descSpan = document.createElement("span");
-                    descSpan.className = "metadata-ai-log-desc";
-                    descSpan.textContent = desc;
-                    entry.appendChild(typeSpan);
-                    entry.appendChild(sepSpan);
-                    entry.appendChild(descSpan);
-                    metadataAiLog.appendChild(entry);
+                    const log = metadataAiLog;
+                    requestAnimationFrame(() => {
+                        log.scrollTop = log.scrollHeight;
+                    });
+                };
+                const logEntries = new Map();
+                const renderLogEntry = (payload, eventType) => {
+                    if (!metadataAiLog) return;
+                    const stepId = payload.step_id || payload.action || eventType;
+                    let entry = logEntries.get(stepId);
+                    if (!entry) {
+                        entry = document.createElement("div");
+                        entry.className = "metadata-ai-log-entry";
+                        const header = document.createElement("div");
+                        header.className = "metadata-ai-log-header";
+                        const title = document.createElement("span");
+                        title.className = "metadata-ai-log-title";
+                        title.textContent = payload.action || payload.status || eventType;
+                        header.appendChild(title);
+                        entry.appendChild(header);
+                        const reasoningEl = document.createElement("div");
+                        reasoningEl.className = "metadata-ai-log-reasoning";
+                        entry.appendChild(reasoningEl);
+                        const outputWrap = document.createElement("div");
+                        outputWrap.className = "metadata-ai-log-outputs";
+                        entry.appendChild(outputWrap);
+                        metadataAiLog.appendChild(entry);
+                        logEntries.set(stepId, entry);
+                    }
+                    const reasoningEl = entry.querySelector(".metadata-ai-log-reasoning");
+                    const outputWrap = entry.querySelector(".metadata-ai-log-outputs");
+                    if (reasoningEl) {
+                        const text = payload.reasoning ? `Reasoning: ${payload.reasoning}` : "";
+                        reasoningEl.textContent = text;
+                        reasoningEl.toggleAttribute("hidden", !text);
+                    }
+                    if (outputWrap) {
+                        if (eventType === "begin") {
+                            outputWrap.innerHTML = "";
+                        } else if (eventType === "result") {
+                            outputWrap.innerHTML = "";
+                            if (payload.description) {
+                                const line = document.createElement("div");
+                                line.className = "metadata-ai-log-output-line";
+                                line.textContent = payload.description;
+                                outputWrap.appendChild(line);
+                            }
+                            if (payload.value) {
+                                const line = document.createElement("div");
+                                line.className = "metadata-ai-log-output-line";
+                                line.textContent = payload.value;
+                                outputWrap.appendChild(line);
+                            }
+                        }
+                    }
+                    scrollLogToBottom();
                 };
                 const applyTags = (tags) => {
                     const list = Array.isArray(tags) ? tags : [];
@@ -439,6 +481,7 @@
                 }
                 if (metadataLoading) {
                     metadataLoading.removeAttribute("hidden");
+                    scrollLogToBottom();
                 }
                 if (metadataAiLog) {
                     metadataAiLog.innerHTML = "";
@@ -468,7 +511,7 @@
                     if (!reader) {
                         const fallbackText = await response.text();
                         if (fallbackText) {
-                            appendLogEntry(fallbackText);
+                            renderLogEntry({ status: fallbackText }, "message");
                         }
                         setMetadataStatus("AI updates ready for review.");
                         if (metadataAiSpinner) {
@@ -500,15 +543,11 @@
                             try {
                                 payload = JSON.parse(payloadText);
                             } catch (error) {
-                                appendLogEntry("Malformed event payload.");
+                                renderLogEntry({ status: "Malformed event payload." }, "error");
                             }
                         }
-                        appendLogEntry(eventName);
-                        if (payload.action) {
-                            appendLogEntry(String(payload.action));
-                        }
-                        if (payload.reasoning) {
-                            appendLogEntry(String(payload.reasoning));
+                        if (eventName === "begin") {
+                            renderLogEntry(payload, eventName);
                         }
                         if (payload.description) {
                             rewrittenDescription = String(payload.description);
@@ -517,8 +556,11 @@
                         if (payload.tags) {
                             applyTags(payload.tags);
                         }
+                        if (eventName === "result") {
+                            renderLogEntry(payload, eventName);
+                        }
                         if (eventName === "error" && payload.detail) {
-                            appendLogEntry(String(payload.detail));
+                            renderLogEntry({ ...payload, reasoning: payload.detail }, eventName);
                             setMetadataStatus("AI cleanup failed.");
                             if (metadataAiSpinner) {
                                 metadataAiSpinner.setAttribute("hidden", "");

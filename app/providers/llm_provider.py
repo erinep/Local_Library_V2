@@ -14,6 +14,14 @@ Message = dict[str, object]
 class LlmProvider:
     """LLM-backed metadata generator using a chat completions API."""
 
+    TAG_INFERENCE_FIELDS: list[tuple[str, str]] = [
+        ("PrimaryType", "tag_inference_primary_type"),
+        ("Mode", "tag_inference_mode"),
+        ("Romance", "tag_inference_romance"),
+        ("Reader", "tag_inference_reader"),
+        ("Setting", "tag_inference_setting"),
+    ]
+
     def __init__(
         self,
         base_url: str | None = None,
@@ -296,6 +304,78 @@ class LlmProvider:
             if value_text:
                 tags.append(f"{key_text}:{value_text}")
         return tags
+
+    def _coerce_tag_value(self, field: str, value: object) -> object:
+        """Normalize a tag inference value for storage."""
+        if field == "Romance":
+            if isinstance(value, (int, float)):
+                numeric = float(value)
+            elif isinstance(value, str):
+                try:
+                    numeric = float(value.strip())
+                except ValueError as exc:
+                    raise HTTPException(
+                        status_code=502,
+                        detail="LLM tag JSON invalid.",
+                    ) from exc
+            else:
+                raise HTTPException(status_code=502, detail="LLM tag JSON invalid.")
+            return max(0.0, min(1.0, numeric))
+        if value is None:
+            raise HTTPException(status_code=502, detail="LLM tag JSON invalid.")
+        if not isinstance(value, str):
+            value = str(value)
+        cleaned = value.strip()
+        if not cleaned:
+            raise HTTPException(status_code=502, detail="LLM tag JSON invalid.")
+        return cleaned
+
+    def get_tag_inference_fields(self) -> list[tuple[str, str]]:
+        """Return the tag inference field/prompt pairs."""
+        return list(self.TAG_INFERENCE_FIELDS)
+
+    def tag_inference_field(
+        self,
+        book_description: str,
+        *,
+        field: str,
+        prompt_name: str,
+        include_reasoning: bool = False,
+    ) -> tuple[object, str | None]:
+        """Infer a single tag field from a book description."""
+        self._require_config()
+        raw_description = book_description.strip() or "No description provided"
+        body = self._request(
+            system_prompt_name=prompt_name,
+            user_content=raw_description,
+            schema_name=None,
+        )
+        choice = self._extract_choice(body)
+        parsed = self._extract_json_content(body, "LLM returned empty tag JSON.")
+        value = self._coerce_tag_value(field, parsed.get(field))
+        reasoning = None
+        if include_reasoning:
+            reasoning = self._extract_reasoning(choice)
+        return value, reasoning
+
+    def tag_inference_split(
+        self,
+        book_description: str,
+        include_reasoning: bool = False,
+    ) -> tuple[list[str], list[tuple[str, str | None]]]:
+        """Infer tags by running separate prompts per field."""
+        tag_mapping: dict[str, object] = {}
+        steps: list[tuple[str, str | None]] = []
+        for field, prompt_name in self.TAG_INFERENCE_FIELDS:
+            value, reasoning = self.tag_inference_field(
+                book_description,
+                field=field,
+                prompt_name=prompt_name,
+                include_reasoning=include_reasoning,
+            )
+            tag_mapping[field] = value
+            steps.append((f"tag_inference_{field.lower()}", reasoning))
+        return self._parse_tag_mapping(tag_mapping), steps
 
     def _clean_description_text(
         self,

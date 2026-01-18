@@ -48,3 +48,26 @@ class MetadataProvider(Protocol):
     ) -> tuple[list[str], str | None]:
         """Infer tags from a book description with optional reasoning."""
         raise NotImplementedError
+
+    def get_tag_inference_fields(self) -> list[tuple[str, str]]:
+        """Return the tag inference field/prompt pairs."""
+        raise NotImplementedError
+
+    def tag_inference_field(
+        self,
+        book_description: str,
+        *,
+        field: str,
+        prompt_name: str,
+        include_reasoning: bool = False,
+    ) -> tuple[object, str | None]:
+        """Infer a single tag field from a book description."""
+        raise NotImplementedError
+
+    def tag_inference_split(
+        self,
+        book_description: str,
+        include_reasoning: bool = False,
+    ) -> tuple[list[str], list[tuple[str, str | None]]]:
+        """Infer tags by running separate prompts per field."""
+        raise NotImplementedError

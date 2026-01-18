@@ -36,7 +36,11 @@
     }
   ],
   "inference_order": [
-    "tag_inference",
-    "description_clean"
+    "description_clean",
+    "tag_inference_primary_type",
+    "tag_inference_mode",
+    "tag_inference_romance",
+    "tag_inference_reader",
+    "tag_inference_setting"
   ]
 }

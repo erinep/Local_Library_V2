@@ -74,7 +74,16 @@ def get_inference_order(path: Path = CONFIG_PATH) -> list[str]:
     configured = raw.get("inference_order") or raw.get("Inference Order") or DEFAULT_INFERENCE_ORDER
     if not isinstance(configured, list):
         return list(DEFAULT_INFERENCE_ORDER)
-    allowed = {"description_clean", "tag_inference"}
+    allowed = {
+        "description_clean",
+        "tag_inference",
+        "tag_inference_primary_type",
+        "tag_inference_primarytype",
+        "tag_inference_mode",
+        "tag_inference_romance",
+        "tag_inference_reader",
+        "tag_inference_setting",
+    }
     cleaned = [str(entry).strip() for entry in configured if str(entry).strip() in allowed]
     return cleaned or list(DEFAULT_INFERENCE_ORDER)
 
