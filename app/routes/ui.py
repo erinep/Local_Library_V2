@@ -231,9 +231,23 @@ def build_ui_router(
         q: str | None = None,
     ):
         """Render a filtered book list by author, tag, or search term."""
+        def _split_book_tags(tags: list[dict[str, object]]) -> tuple[list[str], list[str]]:
+            namespace_tags: list[str] = []
+            topics: list[str] = []
+            for tag in tags:
+                raw = str(tag.get("name") or "")
+                if not raw:
+                    continue
+                if raw.lower().startswith("topic:"):
+                    topics.append(raw.split(":", 1)[1].strip())
+                else:
+                    namespace_tags.append(raw)
+            return namespace_tags, topics
+
         author_name = None
         tag_name = None
         search_term = normalize_search(q)
+        book_cards: list[dict[str, object]] = []
         with get_connection() as conn:
             if author_id is not None and tag_id is not None:
                 rows = []
@@ -249,11 +263,27 @@ def build_ui_router(
                     tag_id=tag_id,
                     search_term=search_term,
                 )
+            for row in rows:
+                tags = get_book_tags(conn, int(row["id"]))
+                namespace_tags, topics = _split_book_tags(
+                    [{"name": tag["name"]} for tag in tags]
+                )
+                book_cards.append(
+                    {
+                        "id": row["id"],
+                        "title": row["title"],
+                        "author": row["author"] or "Unknown author",
+                        "description": row["description"] or "",
+                        "file_count": row["file_count"],
+                        "namespace_tags": namespace_tags,
+                        "topics": topics,
+                    }
+                )
         return templates.TemplateResponse(
             "books.html",
             {
                 "request": request,
-                "books": rows,
+                "books": book_cards,
                 "author_name": author_name,
                 "tag_name": tag_name,
                 "author_id": author_id,

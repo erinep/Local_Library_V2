@@ -101,7 +101,7 @@ app.include_router(
     build_ui_router(
         templates=templates,
         get_connection=get_connection,
-        get_dashboard_data=lambda: get_dashboard_data(get_connection),
+        get_dashboard_data=lambda: get_dashboard_data(get_connection, TAG_NAMESPACE_CONFIG),
         add_tags_to_book=add_tags_to_book,
         remove_tag_from_book=remove_tag_from_book,
         get_or_create_tag=get_or_create_tag,

@@ -36,6 +36,7 @@ def fetch_books_per_author(conn: sqlite3.Connection, limit: int = 10) -> list[sq
     return conn.execute(
         """
         SELECT
+            a.id,
             a.name,
             COUNT(b.id) AS book_count
         FROM authors a
@@ -63,6 +64,29 @@ def fetch_books_per_tag(conn: sqlite3.Connection, limit: int = 10) -> list[sqlit
         LIMIT ?
         """,
         (limit,),
+    ).fetchall()
+
+
+def fetch_books_per_tag_namespace(
+    conn: sqlite3.Connection,
+    tag_prefix: str,
+    limit: int = 10,
+) -> list[sqlite3.Row]:
+    """Fetch book counts per tag within a namespace for the dashboard."""
+    return conn.execute(
+        """
+        SELECT
+            t.id,
+            t.name,
+            COUNT(bt.book_id) AS book_count
+        FROM tags t
+        LEFT JOIN book_tags bt ON bt.tag_id = t.id
+        WHERE t.name LIKE ?
+        GROUP BY t.id
+        ORDER BY book_count DESC, t.name
+        LIMIT ?
+        """,
+        (f"{tag_prefix}:%", limit),
     ).fetchall()
 
 
@@ -262,7 +286,7 @@ def fetch_books(
             b.id,
             b.title,
             a.name AS author,
-            substr(b.description, 1, 160) AS description,
+            b.description AS description,
             (SELECT COUNT(*) FROM files f WHERE f.book_id = b.id) AS file_count
         FROM books b
         LEFT JOIN authors a ON a.id = b.author_id
