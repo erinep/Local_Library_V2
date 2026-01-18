@@ -159,6 +159,7 @@ def fetch_recommendation_books(
             b.id,
             b.title,
             a.name AS author,
+            b.description AS description,
             (SELECT COUNT(*) FROM files f WHERE f.book_id = b.id) AS file_count
         FROM books b
         LEFT JOIN authors a ON a.id = b.author_id
@@ -166,7 +167,7 @@ def fetch_recommendation_books(
         WHERE bt.tag_id IN ({placeholders})
         GROUP BY b.id
         HAVING {' AND '.join(having_clauses)}
-        ORDER BY a.name, b.title
+        ORDER BY RANDOM()
         """,
         params,
     ).fetchall()

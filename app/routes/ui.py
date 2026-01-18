@@ -81,6 +81,19 @@ def build_ui_router(
     @router.get("/recommendations")
     def ui_recommendations(request: Request):
         """Render recommendations based on selected tag filters."""
+        def _split_book_tags(tags: list[dict[str, object]]) -> tuple[list[str], list[str]]:
+            namespace_tags: list[str] = []
+            topics: list[str] = []
+            for tag in tags:
+                raw = str(tag.get("name") or "")
+                if not raw:
+                    continue
+                if raw.lower().startswith("topic:"):
+                    topics.append(raw.split(":", 1)[1].strip())
+                else:
+                    namespace_tags.append(raw)
+            return namespace_tags, topics
+
         def _unique_ids(values: list[int]) -> list[int]:
             return list(dict.fromkeys(values))
 
@@ -125,6 +138,23 @@ def build_ui_router(
             }
 
             rows = fetch_recommendation_books(conn, namespace_filters, topic_ids)
+            book_cards: list[dict[str, object]] = []
+            for row in rows:
+                tags = get_book_tags(conn, int(row["id"]))
+                namespace_tags, topics_for_book = _split_book_tags(
+                    [{"name": tag["name"]} for tag in tags]
+                )
+                book_cards.append(
+                    {
+                        "id": row["id"],
+                        "title": row["title"],
+                        "author": row["author"] or "Unknown author",
+                        "description": row["description"] or "",
+                        "file_count": row["file_count"],
+                        "namespace_tags": namespace_tags,
+                        "topics": topics_for_book,
+                    }
+                )
 
             label_map = {item["id"]: item["display_name"] for group in grouped.values() for item in group}
             topic_labels = {item["id"]: item["display_name"] for item in topics}
@@ -155,7 +185,7 @@ def build_ui_router(
                 "grouped": grouped,
                 "topics": topics,
                 "selected": selected,
-                "books": rows,
+                "books": book_cards,
                 "summary": summary,
             },
         )

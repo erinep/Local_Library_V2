@@ -3,18 +3,34 @@
     <h3>Matches</h3>
     <p class="note">{{ summary }}</p>
     <p class="note">{{ books | length }} results</p>
-    <div class="list">
-      {% for book in books %}
-        <div class="list-item">
-          <div>
-            <a href="/books/{{ book['id'] }}">{{ book['title'] }}</a><br />
-            <small>{{ book['author'] or "Unknown author" }}</small>
+    {% if books %}
+      <div class="list">
+        {% for book in books %}
+          <div class="card">
+            <div>
+              <a href="/books/{{ book['id'] }}">{{ book['title'] }}</a><br />
+              <small>{{ book['author'] }}</small>
+            </div>
+            <p class="note">{{ book['description'] or "No description yet." }}</p>
+            {% if book['namespace_tags'] %}
+              <div class="pill-row">
+                {% for tag in book['namespace_tags'] %}
+                  <span class="tag-pill">{{ tag }}</span>
+                {% endfor %}
+              </div>
+            {% endif %}
+            {% if book['topics'] %}
+              <div class="pill-row">
+                {% for topic in book['topics'] %}
+                  <span class="tag-pill tag-pill-proposed">topic:{{ topic }}</span>
+                {% endfor %}
+              </div>
+            {% endif %}
           </div>
-          <span class="badge">{{ book['file_count'] }} files</span>
-        </div>
-      {% else %}
-        <p class="note">No matching books yet.</p>
-      {% endfor %}
-    </div>
+        {% endfor %}
+      </div>
+    {% else %}
+      <p class="note">No matching books yet.</p>
+    {% endif %}
   </div>
 </section>
