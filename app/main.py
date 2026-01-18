@@ -32,7 +32,7 @@ from .db import (
 )
 from .metadataProvider import get_default_provider
 from .routes.api import build_api_router
-from .routes.bulk_actions import build_bulk_actions_router
+from .routes.batch_actions import build_batch_actions_router
 from .routes.ui import build_ui_router
 from .services.db_queries import log_activity
 from .services.ingest import infer_book_id
@@ -111,7 +111,7 @@ app.include_router(
     )
 )
 app.include_router(
-    build_bulk_actions_router(
+    build_batch_actions_router(
         get_connection=get_connection,
         ActivityEvent=ActivityEvent,
         clean_unused_tags=clean_unused_tags,

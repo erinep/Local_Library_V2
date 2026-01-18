@@ -1,8 +1,8 @@
 (() => {
   const scanButton = document.querySelector("[data-scan]");
   const scanStatus = document.getElementById("scan-status");
-  const bulkMetadataButton = document.querySelector("[data-bulk-metadata]");
-  const bulkMetadataStatus = document.getElementById("bulk-metadata-status");
+  const bulkMetadataButton = document.querySelector("[data-batch-metadata]");
+  const bulkMetadataStatus = document.getElementById("batch-metadata-status");
   const metadataProcessingModal = document.querySelector("[data-modal-id='metadata-processing']");
   const metadataAiLog = metadataProcessingModal
     ? metadataProcessingModal.querySelector("[data-metadata-ai-log]")
@@ -14,7 +14,7 @@
     ? metadataProcessingModal.querySelector("[data-metadata-ai-spinner]")
     : null;
   const bulkMetadataCancel = metadataProcessingModal
-    ? metadataProcessingModal.querySelector("[data-bulk-metadata-cancel]")
+    ? metadataProcessingModal.querySelector("[data-batch-metadata-cancel]")
     : null;
 
   if (scanButton && scanStatus) {
@@ -85,14 +85,14 @@
           bulkMetadataCancel.disabled = true;
           bulkMetadataStatus.textContent = "Cancelling...";
           try {
-            await fetch(`/bulk-actions/metadata/jobs/${activeJobId}`, { method: "DELETE" });
+            await fetch(`/batch-actions/metadata/jobs/${activeJobId}`, { method: "DELETE" });
           } catch (error) {
             // Ignore cancel errors; status poll will reflect outcome.
           }
         };
       }
       try {
-        const response = await fetch("/bulk-actions/metadata/jobs", { method: "POST" });
+        const response = await fetch("/batch-actions/metadata/jobs", { method: "POST" });
         if (!response.ok) {
           throw new Error("Failed to start job.");
         }
@@ -104,7 +104,7 @@
           logRenderer.appendLine(`Job ${activeJobId} queued.`);
         }
         bulkMetadataStatus.textContent = "Running...";
-        eventSource = new EventSource(`/bulk-actions/metadata/jobs/${activeJobId}/stream`);
+        eventSource = new EventSource(`/batch-actions/metadata/jobs/${activeJobId}/stream`);
         const updateProgress = (details) => {
           const processed = Number(details.processed || 0);
           if (totalBooks > 0 && processed > 0) {
@@ -177,7 +177,7 @@
           }
           bulkMetadataStatus.textContent = "Stream disconnected.";
           if (logRenderer) {
-            logRenderer.appendLine("Bulk metadata stream disconnected.");
+            logRenderer.appendLine("Batch metadata stream disconnected.");
           }
           if (metadataAiSpinner) {
             metadataAiSpinner.setAttribute("hidden", "");
@@ -194,7 +194,7 @@
         if (!cancelRequested) {
           bulkMetadataStatus.textContent = "Failed. Check server logs.";
           if (logRenderer) {
-            logRenderer.appendLine("Bulk metadata failed.");
+            logRenderer.appendLine("Batch metadata failed.");
           }
         }
         if (metadataAiSpinner) {
@@ -230,7 +230,7 @@
       cleanTagsButton.disabled = true;
       cleanTagsStatus.textContent = "Cleaning...";
       try {
-        const response = await fetch("/bulk-actions/cleanup-tags", { method: "POST" });
+        const response = await fetch("/batch-actions/cleanup-tags", { method: "POST" });
         if (!response.ok) {
           throw new Error("Cleanup failed.");
         }
@@ -252,7 +252,7 @@
       clearTagsButton.disabled = true;
       clearTagsStatus.textContent = "Clearing...";
       try {
-        const response = await fetch("/bulk-actions/clear-tags", { method: "POST" });
+        const response = await fetch("/batch-actions/clear-tags", { method: "POST" });
         if (!response.ok) {
           throw new Error("Clear failed.");
         }
@@ -276,7 +276,7 @@
       clearDatabaseButton.disabled = true;
       clearDatabaseStatus.textContent = "Clearing...";
       try {
-        const response = await fetch("/bulk-actions/clear-database", { method: "POST" });
+        const response = await fetch("/batch-actions/clear-database", { method: "POST" });
         if (!response.ok) {
           throw new Error("Clear failed.");
         }

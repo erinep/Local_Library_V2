@@ -104,7 +104,7 @@ def fetch_recent_activity(conn: sqlite3.Connection, limit: int = 8) -> list[sqli
 
 
 def fetch_bulk_export_rows(conn: sqlite3.Connection) -> list[sqlite3.Row]:
-    """Fetch export rows for CSV in app/routes/bulk_actions.py."""
+    """Fetch export rows for CSV in app/routes/batch_actions.py."""
     return conn.execute(
         """
         SELECT
@@ -415,7 +415,7 @@ def fetch_book_files(conn: sqlite3.Connection, book_id: int) -> list[sqlite3.Row
 
 
 def book_exists(conn: sqlite3.Connection, book_id: int) -> bool:
-    """Check book existence during CSV import in app/routes/bulk_actions.py."""
+    """Check book existence during CSV import in app/routes/batch_actions.py."""
     row = conn.execute("SELECT 1 FROM books WHERE id = ?", (book_id,)).fetchone()
     return row is not None
 

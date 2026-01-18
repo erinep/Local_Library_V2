@@ -198,7 +198,7 @@
       csvSetStatus("Importing tags...");
       csvSetValidation("");
       try {
-        const response = await fetch("/bulk-actions/import-tags", {
+        const response = await fetch("/batch-actions/import-tags", {
           method: "POST",
           body: formData,
         });

@@ -3,19 +3,19 @@
 {% block content %}
   <section class="hero">
     <div class="card">
-      <h2>Bulk Actions</h2>
+      <h2>Batch Actions</h2>
       <p class="note">Run library-wide maintenance tasks.</p>
     </div>
   </section>
 
-  <section class="section bulk-actions-grid">
-    {% include "components/bulk_actions/core_workflows.html" %}
-    {% include "components/bulk_actions/data_transfer.html" %}
-    {% include "components/bulk_actions/tag_maintenance.html" %}
-    {% include "components/bulk_actions/danger_zone.html" %}
+  <section class="section batch-actions-grid">
+    {% include "components/batch_actions/core_workflows.html" %}
+    {% include "components/batch_actions/data_transfer.html" %}
+    {% include "components/batch_actions/tag_maintenance.html" %}
+    {% include "components/batch_actions/danger_zone.html" %}
   </section>
 
-  {% include "components/bulk_actions/modals_csv_import.html" %}
+  {% include "components/batch_actions/modals_csv_import.html" %}
   {% call modal.modal("metadata-processing", "Processing Metadata", 'data-metadata-processing-modal') %}
     <div class="metadata-processing">
       <div class="metadata-loading-panel">
@@ -23,13 +23,13 @@
         <p class="note">Processing metadata. Please wait...</p>
         <div class="metadata-loading-log" data-metadata-ai-log></div>
         <button class="btn btn-small" type="button" data-metadata-ai-continue hidden>Continue</button>
-        <button class="btn btn-outline btn-small" type="button" data-bulk-metadata-cancel>Cancel</button>
+        <button class="btn btn-outline btn-small" type="button" data-batch-metadata-cancel>Cancel</button>
       </div>
     </div>
   {% endcall %}
 {% endblock %}
 {% block scripts %}
   <script src="/static/metadata_workflow.js"></script>
-  <script src="/static/bulk_actions.js"></script>
+  <script src="/static/batch_actions.js"></script>
   <script src="/static/csv_import.js"></script>
 {% endblock %}

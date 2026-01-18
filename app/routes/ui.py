@@ -64,11 +64,11 @@ def build_ui_router(
             return FileResponse(favicon_path)
         return Response(status_code=204)
 
-    @router.get("/bulk-actions")
-    def ui_bulk_actions(request: Request):
-        """Render the bulk-actions page."""
+    @router.get("/batch-actions")
+    def ui_batch_actions(request: Request):
+        """Render the batch-actions page."""
         return templates.TemplateResponse(
-            "bulk_actions.html",
+            "batch_actions.html",
             {"request": request, "tag_namespaces": TAG_NAMESPACE_LIST},
         )
 

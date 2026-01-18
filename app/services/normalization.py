@@ -5,7 +5,7 @@ import unicodedata
 
 
 def strip_bracketed(value: str) -> str:
-    """Remove bracketed text for normalization in app/routes/bulk_actions.py."""
+    """Remove bracketed text for normalization in app/routes/batch_actions.py."""
     previous = None
     cleaned = value
     patterns = [r"\([^)]*\)", r"\[[^\]]*\]", r"\{[^}]*\}", r"<[^>]*>"]
@@ -17,13 +17,13 @@ def strip_bracketed(value: str) -> str:
 
 
 def fold_to_ascii(value: str) -> str:
-    """Fold unicode strings to ASCII for normalization in app/routes/bulk_actions.py."""
+    """Fold unicode strings to ASCII for normalization in app/routes/batch_actions.py."""
     normalized = unicodedata.normalize("NFKD", value)
     return normalized.encode("ascii", "ignore").decode("ascii")
 
 
 def normalize_title(value: str | None) -> str | None:
-    """Normalize titles for bulk actions in app/routes/bulk_actions.py."""
+    """Normalize titles for batch actions in app/routes/batch_actions.py."""
     if not value:
         return None
     text = fold_to_ascii(value)
@@ -39,7 +39,7 @@ def normalize_title(value: str | None) -> str | None:
 
 
 def normalize_author(value: str | None) -> str | None:
-    """Normalize author names for bulk actions in app/routes/bulk_actions.py."""
+    """Normalize author names for batch actions in app/routes/batch_actions.py."""
     if not value:
         return None
     text = fold_to_ascii(value)

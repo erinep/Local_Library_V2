@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-"""Bulk-action routes for tag management, normalization, and CSV workflows."""
+"""Batch-action routes for tag management, normalization, and CSV workflows."""
 
 import csv
 import io
@@ -35,7 +35,7 @@ from ..services.metadata_jobs import (
     update_metadata_job,
 )
 
-def build_bulk_actions_router(
+def build_batch_actions_router(
     *,
     get_connection,
     ActivityEvent,
@@ -47,11 +47,11 @@ def build_bulk_actions_router(
     add_tags_to_book,
     TAG_NAMESPACE_LIST,
 ) -> APIRouter:
-    """Create the bulk-actions router and wire handlers to injected services."""
+    """Create the batch-actions router and wire handlers to injected services."""
     router = APIRouter()
 
-    @router.get("/bulk-actions/export")
-    def bulk_actions_export() -> Response:
+    @router.get("/batch-actions/export")
+    def batch_actions_export() -> Response:
         """Export library data with tags as a CSV download."""
         with get_connection() as conn:
             rows = fetch_bulk_export_rows(conn)
@@ -107,13 +107,13 @@ def build_bulk_actions_router(
                 ActivityEvent.EXPORT_LIBRARY_CSV,
                 f"{len(books)} books exported",
                 metadata={"book_count": len(books), "tag_prefixes": sorted_prefixes},
-                source="bulk_actions_export",
+                source="batch_actions_export",
             )
         return Response(content=output.getvalue(), media_type="text/csv", headers=headers)
 
-    @router.get("/bulk-actions/metadata/books")
-    def bulk_actions_metadata_books() -> list[dict[str, object]]:
-        """Return basic book info for bulk metadata workflows."""
+    @router.get("/batch-actions/metadata/books")
+    def batch_actions_metadata_books() -> list[dict[str, object]]:
+        """Return basic book info for batch metadata workflows."""
         with get_connection() as conn:
             rows = fetch_books_for_metadata(conn)
         return [
@@ -125,21 +125,21 @@ def build_bulk_actions_router(
             for row in rows
         ]
 
-    @router.post("/bulk-actions/metadata/jobs", response_model=BulkMetadataJobCreateResult)
-    def bulk_metadata_job_start() -> BulkMetadataJobCreateResult:
-        """Queue a bulk metadata processing job."""
+    @router.post("/batch-actions/metadata/jobs", response_model=BulkMetadataJobCreateResult)
+    def batch_metadata_job_start() -> BulkMetadataJobCreateResult:
+        """Queue a batch metadata processing job."""
         with get_connection() as conn:
             active = fetch_active_metadata_job(conn)
             if active:
-                raise HTTPException(status_code=409, detail="Bulk metadata job already running.")
+                raise HTTPException(status_code=409, detail="Batch metadata job already running.")
             rows = fetch_books_for_metadata(conn)
             job_id = create_metadata_job(conn, len(rows))
             log_activity(
                 conn,
                 ActivityEvent.BULK_METADATA_JOB_CREATED,
-                f"bulk metadata job {job_id} queued",
+                f"batch metadata job {job_id} queued",
                 metadata={"job_id": job_id, "total_books": len(rows)},
-                source="bulk_metadata_job_start",
+                source="batch_metadata_job_start",
             )
         queue = get_queue()
         try:
@@ -156,17 +156,17 @@ def build_bulk_actions_router(
             raise HTTPException(status_code=500, detail="Failed to enqueue job.") from exc
         return BulkMetadataJobCreateResult(job_id=job_id, status="queued", total_books=len(rows))
 
-    @router.get("/bulk-actions/metadata/jobs/{job_id}", response_model=BulkMetadataJobStatus)
-    def bulk_metadata_job_status(job_id: int) -> BulkMetadataJobStatus:
-        """Fetch the status of a bulk metadata job."""
+    @router.get("/batch-actions/metadata/jobs/{job_id}", response_model=BulkMetadataJobStatus)
+    def batch_metadata_job_status(job_id: int) -> BulkMetadataJobStatus:
+        """Fetch the status of a batch metadata job."""
         with get_connection() as conn:
             job = fetch_metadata_job(conn, job_id)
         if job is None:
             raise HTTPException(status_code=404, detail="Metadata job not found.")
         return BulkMetadataJobStatus(**job)
 
-    @router.get("/bulk-actions/metadata/jobs/{job_id}/stream")
-    def bulk_metadata_job_stream(job_id: int) -> StreamingResponse:
+    @router.get("/batch-actions/metadata/jobs/{job_id}/stream")
+    def batch_metadata_job_stream(job_id: int) -> StreamingResponse:
         """Stream job updates (per-book events + status changes)."""
         def _send(event: str, data: dict[str, object]) -> bytes:
             payload_text = json.dumps(data, ensure_ascii=True)
@@ -200,9 +200,9 @@ def build_bulk_actions_router(
         }
         return StreamingResponse(_generate(), media_type="text/event-stream", headers=headers)
 
-    @router.delete("/bulk-actions/metadata/jobs/{job_id}", response_model=BulkMetadataJobStatus)
-    def bulk_metadata_job_cancel(job_id: int) -> BulkMetadataJobStatus:
-        """Cancel a bulk metadata job."""
+    @router.delete("/batch-actions/metadata/jobs/{job_id}", response_model=BulkMetadataJobStatus)
+    def batch_metadata_job_cancel(job_id: int) -> BulkMetadataJobStatus:
+        """Cancel a batch metadata job."""
         with get_connection() as conn:
             exists = cancel_metadata_job(conn, job_id)
             if not exists:
@@ -212,16 +212,16 @@ def build_bulk_actions_router(
                 log_activity(
                     conn,
                     ActivityEvent.BULK_METADATA_JOB_CANCELLED,
-                    f"bulk metadata job {job_id} cancelled",
+                    f"batch metadata job {job_id} cancelled",
                     metadata={"job_id": job_id},
-                    source="bulk_metadata_job_cancel",
+                    source="batch_metadata_job_cancel",
                 )
         if job is None:
             raise HTTPException(status_code=404, detail="Metadata job not found.")
         return BulkMetadataJobStatus(**job)
 
-    @router.post("/bulk-actions/cleanup-tags")
-    def bulk_actions_cleanup_tags() -> dict[str, int]:
+    @router.post("/batch-actions/cleanup-tags")
+    def batch_actions_cleanup_tags() -> dict[str, int]:
         """Remove orphaned tags with no book associations."""
         with get_connection() as conn:
             removed = clean_unused_tags(conn)
@@ -234,8 +234,8 @@ def build_bulk_actions_router(
             )
         return {"removed": removed}
 
-    @router.post("/bulk-actions/clear-tags")
-    def bulk_actions_clear_tags() -> dict[str, int]:
+    @router.post("/batch-actions/clear-tags")
+    def batch_actions_clear_tags() -> dict[str, int]:
         """Delete all tags and book-tag relationships."""
         with get_connection() as conn:
             removed_links, removed_tags = clear_all_tags(conn)
@@ -248,8 +248,8 @@ def build_bulk_actions_router(
             )
         return {"removed_links": removed_links, "removed_tags": removed_tags}
 
-    @router.post("/bulk-actions/clear-database")
-    def bulk_actions_clear_database() -> dict[str, str]:
+    @router.post("/batch-actions/clear-database")
+    def batch_actions_clear_database() -> dict[str, str]:
         """Drop and recreate the database schema."""
         with get_connection() as conn:
             clear_database(conn)
@@ -262,8 +262,8 @@ def build_bulk_actions_router(
             )
         return {"status": "cleared"}
 
-    @router.post("/bulk-actions/import-tags", response_model=BulkTagImportResult)
-    async def bulk_actions_import_tags(
+    @router.post("/batch-actions/import-tags", response_model=BulkTagImportResult)
+    async def batch_actions_import_tags(
         file: UploadFile = File(...),
         book_id_column: str = Form(...),
         tag_columns: str = Form(...),

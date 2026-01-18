@@ -37,7 +37,7 @@ def infer_book_id(
 
 
 def parse_tag_columns(raw: str) -> list[str]:
-    """Parse tag column input for CSV import in app/routes/bulk_actions.py."""
+    """Parse tag column input for CSV import in app/routes/batch_actions.py."""
     stripped = raw.strip()
     if not stripped:
         return []
