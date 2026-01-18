@@ -86,3 +86,24 @@ class BulkTagImportResult(BaseModel):
     tags_added: int
     missing_book_ids: list[int]
     invalid_rows: int
+
+
+class BulkMetadataJobCreateResult(BaseModel):
+    job_id: int
+    status: str
+    total_books: int
+
+
+class BulkMetadataJobStatus(BaseModel):
+    job_id: int
+    status: str
+    total_books: int
+    processed_books: int
+    succeeded_books: int
+    failed_books: int
+    current_book_id: int | None = None
+    last_error: str | None = None
+    created_at: float
+    started_at: float | None = None
+    finished_at: float | None = None
+    cancelled_at: float | None = None

@@ -62,8 +62,9 @@
     bulkMetadataButton.addEventListener("click", async () => {
       bulkMetadataButton.disabled = true;
       bulkMetadataStatus.textContent = "Starting...";
-      let cancelled = false;
-      const controller = new AbortController();
+      let cancelRequested = false;
+      let activeJobId = null;
+      let eventSource = null;
       if (bulkMetadataCancel) {
         bulkMetadataCancel.disabled = false;
       }
@@ -78,12 +79,85 @@
       }
       openProcessingModal();
       if (bulkMetadataCancel) {
-        bulkMetadataCancel.onclick = () => {
-          cancelled = true;
-          controller.abort();
-          bulkMetadataStatus.textContent = "Cancelled.";
-          if (logRenderer) {
-            logRenderer.appendLine("Cancelled by user.");
+        bulkMetadataCancel.onclick = async () => {
+          if (!activeJobId) return;
+          cancelRequested = true;
+          bulkMetadataCancel.disabled = true;
+          bulkMetadataStatus.textContent = "Cancelling...";
+          try {
+            await fetch(`/bulk-actions/metadata/jobs/${activeJobId}`, { method: "DELETE" });
+          } catch (error) {
+            // Ignore cancel errors; status poll will reflect outcome.
+          }
+        };
+      }
+      try {
+        const response = await fetch("/bulk-actions/metadata/jobs", { method: "POST" });
+        if (!response.ok) {
+          throw new Error("Failed to start job.");
+        }
+        const payload = await response.json();
+        activeJobId = payload.job_id;
+        const totalBooks = payload.total_books || 0;
+        bulkMetadataStatus.textContent = "Queued.";
+        if (logRenderer) {
+          logRenderer.appendLine(`Job ${activeJobId} queued.`);
+        }
+        bulkMetadataStatus.textContent = "Running...";
+        eventSource = new EventSource(`/bulk-actions/metadata/jobs/${activeJobId}/stream`);
+        const updateProgress = (details) => {
+          const processed = Number(details.processed || 0);
+          if (totalBooks > 0 && processed > 0) {
+            bulkMetadataStatus.textContent = `Processing ${processed} of ${totalBooks}`;
+          }
+        };
+        eventSource.addEventListener("book_completed", (event) => {
+          if (!logRenderer) return;
+          try {
+            const payload = JSON.parse(event.data);
+            const details = payload.payload || {};
+            updateProgress(details);
+            const selected = details.selected || {};
+            const title = details.title || "Untitled";
+            const author = details.author || "Unknown author";
+            const picked = selected.title ? ` -> ${selected.title}` : "";
+            logRenderer.appendLine(`Completed ${title} by ${author}${picked}`);
+          } catch (error) {
+            logRenderer.appendLine("Completed a book.");
+          }
+        });
+        eventSource.addEventListener("book_failed", (event) => {
+          if (!logRenderer) return;
+          try {
+            const payload = JSON.parse(event.data);
+            const details = payload.payload || {};
+            updateProgress(details);
+            const title = details.title || "Untitled";
+            const author = details.author || "Unknown author";
+            const errorText = details.error ? ` (${details.error})` : "";
+            logRenderer.appendLine(`Failed ${title} by ${author}${errorText}`);
+          } catch (error) {
+            logRenderer.appendLine("Failed a book.");
+          }
+        });
+        eventSource.addEventListener("done", (event) => {
+          let finalStatus = "completed";
+          try {
+            const payload = JSON.parse(event.data);
+            finalStatus = payload.status || "completed";
+          } catch (error) {
+            finalStatus = "completed";
+          }
+          if (finalStatus === "completed") {
+            bulkMetadataStatus.textContent = "Complete.";
+          } else if (finalStatus === "failed") {
+            bulkMetadataStatus.textContent = "Failed. Check server logs.";
+          } else if (finalStatus === "cancelled") {
+            bulkMetadataStatus.textContent = "Cancelled.";
+          }
+          if (eventSource) {
+            eventSource.close();
+            eventSource = null;
           }
           if (metadataAiSpinner) {
             metadataAiSpinner.setAttribute("hidden", "");
@@ -91,84 +165,33 @@
           if (metadataAiContinue) {
             metadataAiContinue.removeAttribute("hidden");
           }
+          if (bulkMetadataCancel) {
+            bulkMetadataCancel.disabled = true;
+          }
+          bulkMetadataButton.disabled = false;
+        });
+        eventSource.onerror = () => {
+          if (eventSource) {
+            eventSource.close();
+            eventSource = null;
+          }
+          bulkMetadataStatus.textContent = "Stream disconnected.";
+          if (logRenderer) {
+            logRenderer.appendLine("Bulk metadata stream disconnected.");
+          }
+          if (metadataAiSpinner) {
+            metadataAiSpinner.setAttribute("hidden", "");
+          }
+          if (metadataAiContinue) {
+            metadataAiContinue.removeAttribute("hidden");
+          }
+          bulkMetadataButton.disabled = false;
+          if (bulkMetadataCancel) {
+            bulkMetadataCancel.disabled = true;
+          }
         };
-      }
-      try {
-        const response = await fetch("/bulk-actions/metadata/books");
-        if (!response.ok) {
-          throw new Error("Failed to load books.");
-        }
-        const books = await response.json();
-        for (let index = 0; index < books.length; index += 1) {
-          if (cancelled) break;
-          const book = books[index];
-          bulkMetadataStatus.textContent = `Processing ${index + 1} of ${books.length}`;
-          if (logRenderer) {
-            logRenderer.appendLine(`Book ${book.id}: ${book.title}`);
-          }
-          const results = await window.MetadataWorkflow.searchMetadata({
-            bookId: book.id,
-            title: book.title,
-            author: book.author,
-            signal: controller.signal,
-          });
-          if (cancelled) break;
-          const best = window.MetadataWorkflow.selectBestResult(results);
-          if (!best) {
-            if (logRenderer) {
-              logRenderer.appendLine("No metadata results.");
-            }
-            continue;
-          }
-          const prepared = await window.MetadataWorkflow.prepareMetadata({
-            bookId: book.id,
-            result: best,
-            signal: controller.signal,
-          });
-          if (cancelled) break;
-          const rawDescription = prepared.description || best.description || "";
-          const baseTags = Array.isArray(prepared.tags) ? prepared.tags : [];
-          const aiResult = await window.MetadataWorkflow.runAiCleanStream({
-            bookId: book.id,
-            description: rawDescription,
-            onEvent: (eventName, payload) => {
-              if (!logRenderer) return;
-              if (eventName === "begin" || eventName === "result") {
-                logRenderer.render(eventName, payload);
-              }
-              if (eventName === "error" && payload.detail) {
-                logRenderer.appendLine(`ERROR ${payload.detail}`);
-              }
-            },
-            signal: controller.signal,
-          });
-          if (cancelled) break;
-          const mergedTags = Array.from(new Set([...baseTags, ...aiResult.tags]));
-          const cleanedDescription = aiResult.description || rawDescription || null;
-          await window.MetadataWorkflow.applyMetadata({
-            bookId: book.id,
-            tags: mergedTags,
-            description: cleanedDescription,
-            source: best.source || "google_books",
-            rawDescription,
-            descriptionRewritten: cleanedDescription && cleanedDescription !== rawDescription,
-            signal: controller.signal,
-          });
-          if (logRenderer) {
-            logRenderer.appendLine("Applied metadata.");
-          }
-        }
-        if (!cancelled) {
-          bulkMetadataStatus.textContent = "Complete.";
-        }
-        if (metadataAiSpinner) {
-          metadataAiSpinner.setAttribute("hidden", "");
-        }
-        if (metadataAiContinue) {
-          metadataAiContinue.removeAttribute("hidden");
-        }
       } catch (error) {
-        if (!cancelled) {
+        if (!cancelRequested) {
           bulkMetadataStatus.textContent = "Failed. Check server logs.";
           if (logRenderer) {
             logRenderer.appendLine("Bulk metadata failed.");
@@ -180,10 +203,16 @@
         if (metadataAiContinue) {
           metadataAiContinue.removeAttribute("hidden");
         }
-      } finally {
         bulkMetadataButton.disabled = false;
         if (bulkMetadataCancel) {
           bulkMetadataCancel.disabled = true;
+        }
+      } finally {
+        if (bulkMetadataStatus.textContent === "Starting...") {
+          bulkMetadataButton.disabled = false;
+          if (bulkMetadataCancel) {
+            bulkMetadataCancel.disabled = true;
+          }
         }
       }
     });

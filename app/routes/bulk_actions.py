@@ -4,9 +4,15 @@ from __future__ import annotations
 
 import csv
 import io
+import time
+
+import json
+import time as _time
 
 from fastapi import APIRouter, File, Form, HTTPException, Response, UploadFile
+from fastapi.responses import StreamingResponse
 
+from ..queue import get_queue
 from ..services.db_queries import (
     book_exists,
     fetch_bulk_export_rows,
@@ -14,7 +20,20 @@ from ..services.db_queries import (
     log_activity,
 )
 from ..services.ingest import parse_tag_columns
-from ..schemas import BulkTagImportResult
+from ..schemas import (
+    BulkMetadataJobCreateResult,
+    BulkMetadataJobStatus,
+    BulkTagImportResult,
+)
+from ..services.metadata_jobs import (
+    cancel_metadata_job,
+    create_metadata_job,
+    fetch_active_metadata_job,
+    fetch_metadata_job,
+    fetch_metadata_job_events,
+    run_metadata_job,
+    update_metadata_job,
+)
 
 def build_bulk_actions_router(
     *,
@@ -105,6 +124,101 @@ def build_bulk_actions_router(
             }
             for row in rows
         ]
+
+    @router.post("/bulk-actions/metadata/jobs", response_model=BulkMetadataJobCreateResult)
+    def bulk_metadata_job_start() -> BulkMetadataJobCreateResult:
+        """Queue a bulk metadata processing job."""
+        with get_connection() as conn:
+            active = fetch_active_metadata_job(conn)
+            if active:
+                raise HTTPException(status_code=409, detail="Bulk metadata job already running.")
+            rows = fetch_books_for_metadata(conn)
+            job_id = create_metadata_job(conn, len(rows))
+            log_activity(
+                conn,
+                ActivityEvent.BULK_METADATA_JOB_CREATED,
+                f"bulk metadata job {job_id} queued",
+                metadata={"job_id": job_id, "total_books": len(rows)},
+                source="bulk_metadata_job_start",
+            )
+        queue = get_queue()
+        try:
+            queue.enqueue(run_metadata_job, job_id, job_id=str(job_id))
+        except Exception as exc:
+            with get_connection() as conn:
+                update_metadata_job(
+                    conn,
+                    job_id,
+                    status="failed",
+                    finished_at=time.time(),
+                    last_error=str(exc),
+                )
+            raise HTTPException(status_code=500, detail="Failed to enqueue job.") from exc
+        return BulkMetadataJobCreateResult(job_id=job_id, status="queued", total_books=len(rows))
+
+    @router.get("/bulk-actions/metadata/jobs/{job_id}", response_model=BulkMetadataJobStatus)
+    def bulk_metadata_job_status(job_id: int) -> BulkMetadataJobStatus:
+        """Fetch the status of a bulk metadata job."""
+        with get_connection() as conn:
+            job = fetch_metadata_job(conn, job_id)
+        if job is None:
+            raise HTTPException(status_code=404, detail="Metadata job not found.")
+        return BulkMetadataJobStatus(**job)
+
+    @router.get("/bulk-actions/metadata/jobs/{job_id}/stream")
+    def bulk_metadata_job_stream(job_id: int) -> StreamingResponse:
+        """Stream job updates (per-book events + status changes)."""
+        def _send(event: str, data: dict[str, object]) -> bytes:
+            payload_text = json.dumps(data, ensure_ascii=True)
+            return f"event: {event}\ndata: {payload_text}\n\n".encode("utf-8")
+
+        def _generate():
+            last_event_id = 0
+            last_status = None
+            while True:
+                with get_connection() as conn:
+                    job = fetch_metadata_job(conn, job_id)
+                    if job is None:
+                        yield _send("error", {"detail": "Metadata job not found."})
+                        return
+                    status = job["status"]
+                    if status != last_status:
+                        last_status = status
+                        yield _send("status", {"status": status, "job": job})
+                    for event in fetch_metadata_job_events(conn, job_id, after_id=last_event_id):
+                        last_event_id = event["id"]
+                        yield _send(event["event_type"], event)
+                    if status in ("completed", "failed", "cancelled"):
+                        yield _send("done", {"status": status})
+                        return
+                _time.sleep(1.0)
+
+        headers = {
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        }
+        return StreamingResponse(_generate(), media_type="text/event-stream", headers=headers)
+
+    @router.delete("/bulk-actions/metadata/jobs/{job_id}", response_model=BulkMetadataJobStatus)
+    def bulk_metadata_job_cancel(job_id: int) -> BulkMetadataJobStatus:
+        """Cancel a bulk metadata job."""
+        with get_connection() as conn:
+            exists = cancel_metadata_job(conn, job_id)
+            if not exists:
+                raise HTTPException(status_code=404, detail="Metadata job not found.")
+            job = fetch_metadata_job(conn, job_id)
+            if job and job["status"] == "cancelled":
+                log_activity(
+                    conn,
+                    ActivityEvent.BULK_METADATA_JOB_CANCELLED,
+                    f"bulk metadata job {job_id} cancelled",
+                    metadata={"job_id": job_id},
+                    source="bulk_metadata_job_cancel",
+                )
+        if job is None:
+            raise HTTPException(status_code=404, detail="Metadata job not found.")
+        return BulkMetadataJobStatus(**job)
 
     @router.post("/bulk-actions/cleanup-tags")
     def bulk_actions_cleanup_tags() -> dict[str, int]:

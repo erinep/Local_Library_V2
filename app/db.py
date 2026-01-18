@@ -18,6 +18,10 @@ class ActivityEvent(str, Enum):
     BULK_TAG_IMPORT = "bulk_tag_import"
     CLEAR_ALL_TAGS = "clear_all_tags"
     CLEAR_DATABASE = "clear_database"
+    BULK_METADATA_JOB_CREATED = "bulk_metadata_job_created"
+    BULK_METADATA_JOB_COMPLETED = "bulk_metadata_job_completed"
+    BULK_METADATA_JOB_FAILED = "bulk_metadata_job_failed"
+    BULK_METADATA_JOB_CANCELLED = "bulk_metadata_job_cancelled"
 
 
 def get_connection(db_path: Path | None = None) -> sqlite3.Connection:
@@ -84,10 +88,34 @@ def init_db(conn: sqlite3.Connection) -> None:
             book_id INTEGER,
             FOREIGN KEY(book_id) REFERENCES books(id)
         );
+        CREATE TABLE IF NOT EXISTS metadata_jobs (
+            id INTEGER PRIMARY KEY,
+            status TEXT NOT NULL,
+            total_books INTEGER NOT NULL DEFAULT 0,
+            processed_books INTEGER NOT NULL DEFAULT 0,
+            succeeded_books INTEGER NOT NULL DEFAULT 0,
+            failed_books INTEGER NOT NULL DEFAULT 0,
+            current_book_id INTEGER,
+            last_error TEXT,
+            created_at REAL NOT NULL,
+            started_at REAL,
+            finished_at REAL,
+            cancelled_at REAL
+        );
+        CREATE TABLE IF NOT EXISTS metadata_job_events (
+            id INTEGER PRIMARY KEY,
+            job_id INTEGER NOT NULL,
+            event_type TEXT NOT NULL,
+            payload TEXT,
+            created_at REAL NOT NULL,
+            FOREIGN KEY(job_id) REFERENCES metadata_jobs(id)
+        );
         CREATE INDEX IF NOT EXISTS idx_files_path ON files(path);
         CREATE INDEX IF NOT EXISTS idx_files_book_id ON files(book_id);
         CREATE INDEX IF NOT EXISTS idx_books_title ON books(title);
         CREATE INDEX IF NOT EXISTS idx_books_author_id ON books(author_id);
+        CREATE INDEX IF NOT EXISTS idx_metadata_jobs_status ON metadata_jobs(status);
+        CREATE INDEX IF NOT EXISTS idx_metadata_job_events_job_id ON metadata_job_events(job_id);
         """
     )
     columns = {row["name"] for row in conn.execute("PRAGMA table_info(books)").fetchall()}
