@@ -30,6 +30,9 @@ class MetadataSearchResult(BaseModel):
     categories: list[str] = []
     description: str | None = None
     source: str | None = None
+    identity_score: float | None = None
+    overall_confidence: float | None = None
+    desc_score: float | None = None
 
 
 class MetadataPrepareRequest(BaseModel):

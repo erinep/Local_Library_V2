@@ -213,6 +213,18 @@
                 const author = document.createElement("div");
                 author.className = "note";
                 author.textContent = result.author || "Unknown author";
+                const confidence = document.createElement("div");
+                confidence.className = "note";
+                const confidenceText = typeof result.overall_confidence === "number"
+                    ? result.overall_confidence.toFixed(2)
+                    : "n/a";
+                const identityText = typeof result.identity_score === "number"
+                    ? result.identity_score.toFixed(2)
+                    : "n/a";
+                const descScoreText = typeof result.desc_score === "number"
+                    ? result.desc_score.toFixed(2)
+                    : "n/a";
+                confidence.textContent = `OverallConfidence: ${confidenceText} | Identity: ${identityText} | Desc score: ${descScoreText}`;
                 const year = document.createElement("div");
                 year.className = "note";
                 year.textContent = result.published_year ? `Year: ${result.published_year}` : "Year: n/a";
@@ -252,6 +264,7 @@
                     : "Description: none";
                 info.appendChild(title);
                 info.appendChild(author);
+                info.appendChild(confidence);
                 info.appendChild(year);
                 info.appendChild(isbn);
                 info.appendChild(categories);

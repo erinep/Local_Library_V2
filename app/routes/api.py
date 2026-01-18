@@ -20,6 +20,7 @@ from ..schemas import (
     MetadataSearchResult,
     ScanResult,
 )
+from ..services.metadata_scoring import confidence_score
 from ..services.db_queries import (
     fetch_book_detail,
     update_book_description,
@@ -105,6 +106,13 @@ def build_api_router(
             description = volume.get("description") if isinstance(volume, dict) else None
             if not isinstance(description, str):
                 description = None
+            confidence_product, desc_score, identity_score = confidence_score(
+                query_title=title,
+                query_author=author,
+                candidate_title=result.title,
+                candidate_author=result.author,
+                description=description,
+            )
             response.append(
                 MetadataSearchResult(
                     result_id=result.result_id,
@@ -116,6 +124,9 @@ def build_api_router(
                     categories=[str(item) for item in categories],
                     description=description,
                     source="google_books",
+                    identity_score=identity_score,
+                    overall_confidence=confidence_product,
+                    desc_score=desc_score,
                 )
             )
         return response

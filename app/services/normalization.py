@@ -32,6 +32,8 @@ def normalize_title(value: str | None) -> str | None:
     text = re.sub(r"\b(vol|volume|book|part|series)\.?\s*\d+\b", " ", text, flags=re.IGNORECASE)
     text = re.sub(r"(#|no\.?|number)\s*\d+\b", " ", text, flags=re.IGNORECASE)
     text = re.sub(r"[\"'`~!@#$%^*_=+|\\/;:,?.-]", " ", text)
+    text = re.sub(r"^\s*\d+\s+", " ", text)
+    text = re.sub(r"\s+\d+\s*$", " ", text)
     text = re.sub(r"\s+", " ", text).strip().lower()
     return text or None
 
