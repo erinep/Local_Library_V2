@@ -200,6 +200,11 @@ nav a:hover {
   background: #fffdf7;
 }
 
+.list-item-best {
+  border-color: rgba(31, 111, 91, 0.6);
+  box-shadow: 0 0 0 2px rgba(31, 111, 91, 0.12);
+}
+
 .list-item.is-selected {
   border-color: var(--accent);
   box-shadow: 0 0 0 1px rgba(31, 111, 91, 0.2);
@@ -398,25 +403,6 @@ nav a:hover {
   background: rgba(31, 111, 91, 0.2);
 }
 
-.btn-ai .ai-spinner {
-  display: none;
-  width: 14px;
-  height: 14px;
-  border-radius: 50%;
-  border: 2px solid rgba(31, 111, 91, 0.2);
-  border-top-color: var(--accent);
-  margin-left: 6px;
-  animation: spin 700ms linear infinite;
-}
-
-.metadata-desc-wrap.is-loading .btn-ai .ai-label {
-  display: none;
-}
-
-.metadata-desc-wrap.is-loading .btn-ai .ai-spinner {
-  display: inline-block;
-}
-
 .metadata-desc-wrap {
   position: relative;
 }
@@ -425,19 +411,10 @@ nav a:hover {
   position: relative;
 }
 
-.btn-ai {
-  position: absolute;
-  top: 8px;
-  right: 8px;
-  background: #fffdf7;
-  border-color: var(--line);
-  color: var(--muted);
-  box-shadow: none;
-}
-
-.btn-ai:hover {
-  color: var(--accent);
-  border-color: rgba(31, 111, 91, 0.4);
+.metadata-processing {
+  display: grid;
+  place-items: center;
+  padding: 8px 0;
 }
 
 .metadata-loading {
@@ -777,6 +754,10 @@ nav a:hover {
 }
 
 .modal[data-modal-id="metadata-review"] .modal-panel {
+  overflow: hidden;
+}
+
+.modal[data-modal-id="metadata-processing"] .modal-panel {
   overflow: hidden;
 }
 

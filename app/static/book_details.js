@@ -134,14 +134,16 @@
         const metadataTags = metadataReviewModal.querySelector("[data-metadata-tags]");
         const metadataDescription = metadataReviewModal.querySelector("[data-metadata-description]");
         const metadataApply = metadataReviewModal.querySelector("[data-metadata-apply]");
-        const metadataAiClean = metadataReviewModal.querySelector("[data-metadata-ai-clean]");
+        const metadataProcessingModal = document.querySelector("[data-modal-id='metadata-processing']");
         const metadataDescWrap = metadataReviewModal.querySelector("[data-metadata-desc-wrap]");
         const metadataBack = metadataReviewModal.querySelector("[data-metadata-back]");
         const metadataCancel = metadataReviewModal.querySelector("[data-metadata-cancel]");
-        const metadataLoading = metadataReviewModal.querySelector("[data-metadata-loading]");
-        const metadataAiLog = metadataReviewModal.querySelector("[data-metadata-ai-log]");
-        const metadataAiContinue = metadataReviewModal.querySelector("[data-metadata-ai-continue]");
-        const metadataAiSpinner = metadataReviewModal.querySelector("[data-metadata-ai-spinner]");
+        const metadataAiLog = metadataProcessingModal
+            ? metadataProcessingModal.querySelector("[data-metadata-ai-log]")
+            : null;
+        const metadataAiSpinner = metadataProcessingModal
+            ? metadataProcessingModal.querySelector("[data-metadata-ai-spinner]")
+            : null;
         let activeResult = null;
         let originalDescription = "";
         let rewrittenDescription = "";
@@ -161,41 +163,23 @@
             rewrittenDescription = "";
             activeResult = null;
             activeSource = "google_books";
-            if (metadataAiClean) {
-                metadataAiClean.disabled = false;
-                metadataAiClean.removeAttribute("title");
-            }
             if (metadataAiLog) {
                 metadataAiLog.innerHTML = "";
             }
-            if (metadataAiContinue) {
-                metadataAiContinue.setAttribute("hidden", "");
-            }
         };
 
-        const closeAiLoading = () => {
+        const openReviewModal = () => {
+            if (window.ModalController) {
+                window.ModalController.close("metadata-processing");
+                window.ModalController.open("metadata-review");
+            }
             if (metadataDescWrap) {
                 metadataDescWrap.classList.remove("is-loading");
-            }
-            if (metadataLoading) {
-                metadataLoading.setAttribute("hidden", "");
             }
             if (metadataApply) {
                 metadataApply.disabled = false;
             }
-            if (metadataAiClean) {
-                metadataAiClean.disabled = false;
-            }
-            if (metadataAiSpinner) {
-                metadataAiSpinner.removeAttribute("hidden");
-            }
         };
-
-        if (metadataAiContinue) {
-            metadataAiContinue.addEventListener("click", () => {
-                closeAiLoading();
-            });
-        }
 
         const renderResults = (results) => {
             if (!metadataResults) return;
@@ -204,9 +188,18 @@
                 metadataResults.innerHTML = '<p class="note">No results found.</p>';
                 return;
             }
+            const scored = results
+                .map((result, index) => ({ result, index }))
+                .filter((entry) => typeof entry.result.overall_confidence === "number");
+            const maxConfidence = scored.length
+                ? Math.max(...scored.map((entry) => entry.result.overall_confidence))
+                : null;
             results.forEach((result) => {
                 const item = document.createElement("div");
                 item.className = "list-item";
+                if (maxConfidence !== null && result.overall_confidence === maxConfidence) {
+                    item.classList.add("list-item-best");
+                }
                 const info = document.createElement("div");
                 const title = document.createElement("strong");
                 title.textContent = result.title || "Untitled";
@@ -275,15 +268,18 @@
                 selectButton.className = "btn btn-outline btn-small";
                 selectButton.type = "button";
                 selectButton.textContent = "Select";
-                selectButton.addEventListener("click", () => {
+                selectButton.addEventListener("click", async () => {
                     activeResult = result;
                     activeSource = result.source || "google_books";
                     setMetadataStatus("Preparing metadata for review...");
                     if (window.ModalController) {
-                        window.ModalController.open("metadata-review");
+                        window.ModalController.open("metadata-processing");
                         window.ModalController.close("fetch-metadata");
                     }
-                    prepareMetadata();
+                    const ok = await prepareMetadata();
+                    if (ok) {
+                        runAiCleanup();
+                    }
                 });
                 actions.appendChild(selectButton);
 
@@ -334,8 +330,10 @@
                     metadataDescription.value = originalDescription;
                 }
                 setMetadataStatus("Metadata ready for review.");
+                return true;
             } catch (error) {
                 setMetadataStatus("Unable to prepare metadata for review.");
+                return false;
             }
         };
 
@@ -401,9 +399,8 @@
             });
         }
 
-        if (metadataAiClean) {
-            metadataAiClean.addEventListener("click", async () => {
-                if (!metadataDescription || !metadataTags || !activeBookId) return;
+        const runAiCleanup = async () => {
+            if (!metadataDescription || !metadataTags || !activeBookId) return;
                 const scrollLogToBottom = () => {
                     if (!metadataAiLog) return;
                     const log = metadataAiLog;
@@ -492,20 +489,12 @@
                 if (metadataDescWrap) {
                     metadataDescWrap.classList.add("is-loading");
                 }
-                if (metadataLoading) {
-                    metadataLoading.removeAttribute("hidden");
-                    scrollLogToBottom();
-                }
                 if (metadataAiLog) {
                     metadataAiLog.innerHTML = "";
-                }
-                if (metadataAiContinue) {
-                    metadataAiContinue.setAttribute("hidden", "");
                 }
                 if (metadataApply) {
                     metadataApply.disabled = true;
                 }
-                metadataAiClean.disabled = true;
                 if (metadataAiSpinner) {
                     metadataAiSpinner.removeAttribute("hidden");
                 }
@@ -530,9 +519,7 @@
                         if (metadataAiSpinner) {
                             metadataAiSpinner.setAttribute("hidden", "");
                         }
-                        if (metadataAiContinue) {
-                            metadataAiContinue.removeAttribute("hidden");
-                        }
+                        openReviewModal();
                         return;
                     }
                     const decoder = new TextDecoder();
@@ -584,6 +571,7 @@
                             if (metadataAiSpinner) {
                                 metadataAiSpinner.setAttribute("hidden", "");
                             }
+                            openReviewModal();
                         }
                     };
                     while (true) {
@@ -609,13 +597,8 @@
                     if (metadataAiSpinner) {
                         metadataAiSpinner.setAttribute("hidden", "");
                     }
-                } finally {
-                    if (metadataAiContinue) {
-                        metadataAiContinue.removeAttribute("hidden");
-                    }
                 }
-            });
-        }
+        };
 
         if (metadataBack) {
             metadataBack.addEventListener("click", () => {
@@ -668,10 +651,6 @@
             const originalOpen = window.ModalController.open?.bind(window.ModalController);
             if (originalOpen) {
                 window.ModalController.open = (modalId) => {
-                    if (modalId === "metadata-review" && metadataAiClean) {
-                        metadataAiClean.disabled = false;
-                        metadataAiClean.removeAttribute("title");
-                    }
                     return originalOpen(modalId);
                 };
             }

@@ -145,14 +145,6 @@
 
   {% call modal.modal("metadata-review", "Review Metadata", 'data-metadata-review-modal') %}
     <div class="metadata-review" data-metadata-review>
-      <div class="metadata-loading" data-metadata-loading hidden>
-        <div class="metadata-loading-panel">
-          <div class="spinner" data-metadata-ai-spinner aria-hidden="true"></div>
-          <p class="note">Processing metadata. Please wait...</p>
-          <div class="metadata-loading-log" data-metadata-ai-log></div>
-          <button class="btn btn-small" type="button" data-metadata-ai-continue hidden>Continue</button>
-        </div>
-      </div>
       <p class="note">Tags</p>
       <div class="tag-list" data-metadata-tags></div>
       
@@ -162,9 +154,18 @@
       </div>
       <div class="tag-form metadata-controls">
         <button class="btn btn-outline btn-small" type="button" data-metadata-back>Back</button>
-        <button class="btn btn-outline btn-small btn-ai" type="button" data-metadata-ai-clean>AI ✨</button>
         <button class="btn btn-small" type="button" data-metadata-apply>Apply</button>
         <button class="btn btn-outline btn-danger btn-small" type="button" data-metadata-cancel>Cancel</button>
+      </div>
+    </div>
+  {% endcall %}
+
+  {% call modal.modal("metadata-processing", "Processing Metadata", 'data-metadata-processing-modal') %}
+    <div class="metadata-processing">
+      <div class="metadata-loading-panel">
+        <div class="spinner" data-metadata-ai-spinner aria-hidden="true"></div>
+        <p class="note">Processing metadata. Please wait...</p>
+        <div class="metadata-loading-log" data-metadata-ai-log></div>
       </div>
     </div>
   {% endcall %}
