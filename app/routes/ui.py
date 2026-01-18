@@ -192,17 +192,17 @@ def build_ui_router(
                 if names:
                     summary_label = label_lookup.get(key, key)
                     summary_parts.append(f"{summary_label}: {', '.join(names)}")
-        for entry in TAG_NAMESPACE_CONFIG:
-            if entry.get("style") != "range":
-                continue
-            prefix = entry["tag_prefix"]
-            min_value, max_value = range_filters.get(prefix, (None, None))
-            if min_value is None and max_value is None:
-                continue
-            range_label = label_lookup.get(prefix, prefix)
-            min_text = "0" if min_value is None else str(min_value)
-            max_text = "1" if max_value is None else str(max_value)
-            summary_parts.append(f"{range_label}: {min_text} - {max_text}")
+            for entry in TAG_NAMESPACE_CONFIG:
+                if entry.get("style") != "range":
+                    continue
+                prefix = entry["tag_prefix"]
+                min_value, max_value = range_filters.get(prefix, (None, None))
+                if min_value is None and max_value is None:
+                    continue
+                range_label = label_lookup.get(prefix, prefix)
+                min_text = "0" if min_value is None else str(min_value)
+                max_text = "1" if max_value is None else str(max_value)
+                summary_parts.append(f"{range_label}: {min_text} - {max_text}")
             if topic_ids:
                 names = [topic_labels.get(tid) for tid in topic_ids if topic_labels.get(tid)]
                 if names:

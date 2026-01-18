@@ -3,30 +3,33 @@
   {% set range = range_values.get(ns['tag_prefix'], {}) %}
   {% set min_value = range.get('min') if range.get('min') is not none else '' %}
   {% set max_value = range.get('max') if range.get('max') is not none else '' %}
-  <div class="rec-range">
-    <label class="rec-range-label">
-      Min
-      <input
-        class="input"
-        type="number"
-        min="0"
-        max="1"
-        step="0.05"
-        name="{{ ns['tag_prefix'] }}_min"
-        value="{{ min_value }}"
-      />
-    </label>
-    <label class="rec-range-label">
-      Max
-      <input
-        class="input"
-        type="number"
-        min="0"
-        max="1"
-        step="0.05"
-        name="{{ ns['tag_prefix'] }}_max"
-        value="{{ max_value }}"
-      />
-    </label>
+  <div class="rec-range-slider" data-range-slider>
+    <div class="rec-range-track"></div>
+    <div class="rec-range-fill" data-range-fill></div>
+    <input
+      class="rec-range-input"
+      type="range"
+      min="0"
+      max="1"
+      step="0.1"
+      value="{{ min_value if min_value != '' else 0 }}"
+      data-range-min
+    />
+    <input
+      class="rec-range-input"
+      type="range"
+      min="0"
+      max="1"
+      step="0.1"
+      value="{{ max_value if max_value != '' else 1 }}"
+      data-range-max
+    />
   </div>
+  <div class="rec-range-summary">
+    <span data-range-display="min">{{ min_value if min_value != '' else 0 }}</span>
+    <span class="rec-range-sep">to</span>
+    <span data-range-display="max">{{ max_value if max_value != '' else 1 }}</span>
+  </div>
+  <input type="hidden" name="{{ ns['tag_prefix'] }}_min" value="{{ min_value }}" data-range-hidden-min />
+  <input type="hidden" name="{{ ns['tag_prefix'] }}_max" value="{{ max_value }}" data-range-hidden-max />
 </div>
