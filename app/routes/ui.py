@@ -262,7 +262,11 @@ def build_ui_router(
             topic_rows = fetch_tags_with_counts(conn, include_topics=True)
             files = fetch_book_files(conn, book_id)
         if book is None:
-            return Response(status_code=404)
+            return templates.TemplateResponse(
+                "404.html",
+                {"request": request},
+                status_code=404,
+            )
         active_topics = [
             {
                 "id": tag["id"],

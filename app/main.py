@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from dotenv import load_dotenv
+from starlette.exceptions import HTTPException as StarletteHTTPException
+from starlette.responses import JSONResponse
 
 from .config import (
     get_inference_order,
@@ -52,6 +54,17 @@ def _urlencode(value: object) -> str:
 
 
 templates.env.filters["urlencode"] = urlencode_value
+
+
+@app.exception_handler(StarletteHTTPException)
+async def http_exception_handler(request: Request, exc: StarletteHTTPException):
+    if exc.status_code == 404 and "text/html" in request.headers.get("accept", ""):
+        return templates.TemplateResponse(
+            "404.html",
+            {"request": request},
+            status_code=404,
+        )
+    return JSONResponse({"detail": exc.detail}, status_code=exc.status_code)
 
 TAG_NAMESPACE_CONFIG = get_tag_namespace_config()
 TAG_NAMESPACE_LIST = get_tag_namespace_list(TAG_NAMESPACE_CONFIG)
