@@ -418,8 +418,10 @@ def run_metadata_job(job_id: int) -> None:
                     return
 
                 book_id = int(row["id"])
-                title = row["title"] or ""
-                author = row["author"] or ""
+                raw_title = row["title"] or ""
+                raw_author = row["author"] or ""
+                title = row["normalized_title"] or raw_title
+                author = row["normalized_author"] or raw_author
                 update_metadata_job(conn, job_id, current_book_id=book_id)
 
                 try:
@@ -435,8 +437,8 @@ def run_metadata_job(job_id: int) -> None:
                             "book_failed",
                             {
                                 "book_id": book_id,
-                                "title": title,
-                                "author": author,
+                                "title": raw_title,
+                                "author": raw_author,
                                 "error": error_message,
                                 "selected": selected,
                                 "processed": processed + 1,
@@ -452,8 +454,8 @@ def run_metadata_job(job_id: int) -> None:
                             "book_completed",
                             {
                                 "book_id": book_id,
-                                "title": title,
-                                "author": author,
+                                "title": raw_title,
+                                "author": raw_author,
                                 "selected": selected,
                                 "processed": processed + 1,
                                 "succeeded": succeeded,
@@ -469,8 +471,8 @@ def run_metadata_job(job_id: int) -> None:
                         "book_failed",
                         {
                             "book_id": book_id,
-                            "title": title,
-                            "author": author,
+                            "title": raw_title,
+                            "author": raw_author,
                             "error": str(exc),
                             "processed": processed + 1,
                             "succeeded": succeeded,

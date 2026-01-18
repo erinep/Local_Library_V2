@@ -128,7 +128,10 @@ def fetch_books_for_metadata(conn: sqlite3.Connection) -> list[sqlite3.Row]:
         SELECT
             b.id,
             b.title,
+            b.normalized_title,
             a.name AS author
+            ,
+            a.normalized_author
         FROM books b
         LEFT JOIN authors a ON a.id = b.author_id
         ORDER BY b.id
