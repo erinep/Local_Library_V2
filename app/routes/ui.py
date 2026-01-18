@@ -15,6 +15,7 @@ from ..services.db_queries import (
     fetch_book_detail,
     fetch_book_files,
     fetch_books,
+    fetch_adjacent_book_ids,
     fetch_recommendation_books,
     fetch_tag_name,
     fetch_tag_rows_for_recommendations,
@@ -261,6 +262,7 @@ def build_ui_router(
             tags = get_book_tags(conn, book_id)
             topic_rows = fetch_tags_with_counts(conn, include_topics=True)
             files = fetch_book_files(conn, book_id)
+            prev_id, next_id = fetch_adjacent_book_ids(conn, book_id)
         if book is None:
             return templates.TemplateResponse(
                 "404.html",
@@ -304,6 +306,8 @@ def build_ui_router(
                     }
                     for row in files
                 ],
+                "prev_id": prev_id,
+                "next_id": next_id,
             },
         )
 

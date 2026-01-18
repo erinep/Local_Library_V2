@@ -84,6 +84,17 @@ nav a:hover {
   margin: 0 0 8px;
 }
 
+.nav-buttons {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.nav-buttons [data-disabled="true"] {
+  pointer-events: none;
+  opacity: 0.5;
+}
+
 .card small {
   color: var(--muted);
 }

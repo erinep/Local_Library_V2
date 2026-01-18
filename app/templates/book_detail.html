@@ -4,6 +4,14 @@
   <section class="hero">
     <div class="card">
       <h2>{{ book['title'] }}</h2>
+      <div class="nav-buttons">
+        <a class="btn btn-outline btn-small" href="/books/{{ prev_id }}" {% if not prev_id %}aria-disabled="true" data-disabled="true"{% endif %}>
+          Prev
+        </a>
+        <a class="btn btn-outline btn-small" href="/books/{{ next_id }}" {% if not next_id %}aria-disabled="true" data-disabled="true"{% endif %}>
+          Next
+        </a>
+      </div>
       <p>
         <strong>
           {% if book['author_id'] %}

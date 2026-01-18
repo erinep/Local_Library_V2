@@ -272,6 +272,24 @@ def fetch_book_detail(conn: sqlite3.Connection, book_id: int) -> sqlite3.Row | N
     ).fetchone()
 
 
+def fetch_adjacent_book_ids(
+    conn: sqlite3.Connection,
+    book_id: int,
+) -> tuple[int | None, int | None]:
+    """Fetch previous and next book ids for navigation in app/routes/ui.py."""
+    prev_row = conn.execute(
+        "SELECT id FROM books WHERE id < ? ORDER BY id DESC LIMIT 1",
+        (book_id,),
+    ).fetchone()
+    next_row = conn.execute(
+        "SELECT id FROM books WHERE id > ? ORDER BY id ASC LIMIT 1",
+        (book_id,),
+    ).fetchone()
+    prev_id = int(prev_row["id"]) if prev_row else None
+    next_id = int(next_row["id"]) if next_row else None
+    return prev_id, next_id
+
+
 def update_book_description(conn: sqlite3.Connection, book_id: int, description: str | None) -> None:
     """Update a book description in app/routes/api.py."""
     conn.execute(
